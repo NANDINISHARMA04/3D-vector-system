@@ -2,6 +2,8 @@
 // from the server-side AI assistant, or from the built-in lessons when offline,
 // and is read aloud.
 import { LESSONS } from './content.js';
+import { findAnswer } from './faq.js';
+import { deviceCanTranslate, deviceTranslate } from './device-translate.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -89,8 +91,8 @@ export function initAsk({ i18n, narrator, context, toast }) {
       answer = data.answer;
     } catch (err) {
       if (err.message !== 'offline') console.warn('[ask]', err.message);
-      answer = offlineAnswer(q);
-      meta = i18n.t('offlineAnswer');
+      answer = await builtInAnswer(q);
+      meta = i18n.t('builtIn');
     }
     pending.remove();
     bubble('bot', answer, meta);
@@ -98,25 +100,54 @@ export function initAsk({ i18n, narrator, context, toast }) {
     busy = false;
   }
 
-  // Without the AI: find the part the question mentions and answer from the lessons.
-  function offlineAnswer(q) {
+  // Without the AI (free): answer from the built-in question bank, or from the
+  // lesson for the part the question mentions. Other languages are translated
+  // on the device when the browser supports it.
+  async function builtInAnswer(q) {
+    const lang = i18n.lang === 'hi' ? 'hi' : 'en';
+    const text = builtInText(q, lang);
+    if (i18n.lang === 'en' || i18n.lang === 'hi' || !text.english) return text.local;
+    if (await deviceCanTranslate(i18n.lang)) {
+      try {
+        return (await deviceTranslate(i18n.lang, [text.local]))[0];
+      } catch {
+        /* fall through to the untranslated answer */
+      }
+    }
+    return text.local;
+  }
+
+  function builtInText(q, lang) {
     const words = q.toLowerCase();
     const ctx = context();
+    const partAnswer = (id, part) => {
+      const local = i18n.part(id, part);
+      return `${local.name}: ${local.summary} ${i18n.say('didYouKnow')} ${local.fact}`;
+    };
+    // Which body part does the question name?
+    let mentioned = null;
     const ids = [ctx.modelId, ...Object.keys(LESSONS).filter((id) => id !== ctx.modelId)];
-    for (const id of ids) {
+    search: for (const id of ids) {
       for (const part of Object.keys(LESSONS[id].parts)) {
-        const local = i18n.part(id, part);
-        const names = [part.toLowerCase(), local.name.toLowerCase(), part.toLowerCase().replace(/s$/, '')];
+        const local = i18n.part(id, part).name.toLowerCase();
+        const names = [part.toLowerCase(), part.toLowerCase().replace(/s$/, ''), local, local.split(' (')[0]];
         if (names.some((n) => n.length > 2 && words.includes(n))) {
-          return `${local.name}: ${local.summary} ${i18n.say('didYouKnow')} ${local.fact}`;
+          mentioned = [id, part];
+          break search;
         }
       }
     }
-    if (ctx.partName) {
-      const local = i18n.part(ctx.modelId, ctx.partName);
-      return `${local.name}: ${local.summary} ${i18n.say('didYouKnow')} ${local.fact}`;
-    }
-    return i18n.model(ctx.modelId).intro;
+    const faq = findAnswer(q, lang);
+    // A specific "why/how" question beats a plain part description.
+    if (faq && (faq.score >= 2 || !mentioned)) return { local: faq.text, english: lang === 'en' };
+    if (mentioned) return { local: partAnswer(...mentioned), english: false };
+    if (ctx.partName && /\b(this|it|that)\b|यह|इस/.test(words)) return { local: partAnswer(ctx.modelId, ctx.partName), english: false };
+    return {
+      local: lang === 'hi'
+        ? 'बहुत अच्छा सवाल! मैं शरीर का विशेषज्ञ हूँ। मुझसे दिल, दिमाग, हड्डियों या साँस के बारे में पूछें, या अपने शिक्षक से पूछें।'
+        : 'That’s a great question! I’m a body expert, so try asking me about your heart, brain, bones or breathing, or ask your teacher.',
+      english: lang === 'en',
+    };
   }
 
   $('#ask-form').addEventListener('submit', (e) => {

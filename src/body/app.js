@@ -17,6 +17,7 @@ import { LESSONS, SECTIONS } from './content.js';
 import { Narrator } from './speech.js';
 import { I18n, LANGS, applyStatic } from './i18n.js';
 import { initAsk } from './ask.js';
+import { deviceCanTranslate } from './device-translate.js';
 import { initDashboard } from './dashboard.js';
 import { initBuilder } from './builder.js';
 import { getRoster, saveRoster, addStudent, addResult, getLessons, getAudio, getSettings, saveSettings, TEAM_COLORS } from './store.js';
@@ -385,7 +386,7 @@ function fillLangSelects() {
       ...Object.entries(LANGS).map(([code, l]) => {
         const o = document.createElement('option');
         o.value = code;
-        o.textContent = sel.id === 'lang' ? l.native : `${l.native} · ${l.name}${l.offline ? '' : ' (AI)'}`;
+        o.textContent = sel.id === 'lang' ? l.native : `${l.native} · ${l.name}`;
         o.selected = code === i18n.lang;
         return o;
       }),
@@ -393,12 +394,20 @@ function fillLangSelects() {
   }
 }
 
+// AI translation when a key is set up, otherwise the browser's free on-device translator.
+async function translationEngine(lang) {
+  if (S.ai) return 'ai';
+  return (await deviceCanTranslate(lang)) ? 'device' : null;
+}
+
 async function translateCurrent() {
-  if (!S.model || !S.ai) return;
+  if (!S.model) return;
+  const engine = await translationEngine(i18n.lang);
+  if (!engine) return;
   const id = S.model.id;
   toast(i18n.t('translating', { lang: i18n.info.native }));
   try {
-    await i18n.translateModel(id, englishLabel(id), findModel(id).subtitle);
+    await i18n.translateModel(id, englishLabel(id), findModel(id).subtitle, engine);
     if (S.model?.id === id) refreshModelText();
     renderSidebar();
   } catch (err) {
@@ -407,9 +416,9 @@ async function translateCurrent() {
   }
 }
 
-function setLang(code, { announce = true } = {}) {
+async function setLang(code, { announce = true } = {}) {
   if (!LANGS[code] || code === i18n.lang) return fillLangSelects();
-  if (!LANGS[code].offline && !S.ai) {
+  if (!LANGS[code].offline && !(await translationEngine(code))) {
     toast(i18n.t('needsAi', { lang: LANGS[code].native }));
     return fillLangSelects();
   }

@@ -2,6 +2,19 @@ import { test, expect } from '@playwright/test';
 
 const URL = '/body.html?particles=20000';
 const state = (page) => page.evaluate(() => window.__body.state);
+
+// Chrome's on-device Translator API, faked so tests are deterministic.
+const fakeTranslator = (page, available) =>
+  page.addInitScript((available) => {
+    self.Translator = {
+      availability: async () => (available ? 'available' : 'unavailable'),
+      create: async ({ targetLanguage }) => ({ translate: async (t) => `[${targetLanguage}] ${t}` }),
+    };
+  }, available);
+
+test.beforeEach(async ({ page }) => {
+  await fakeTranslator(page, false);
+});
 const lastSpoken = async (page) => (await state(page)).spoken.at(-1) ?? '';
 
 async function ready(page, query = '') {
@@ -221,7 +234,7 @@ test.describe('Body Explorer', () => {
     await page.route('**/api/status', (r) => r.fulfill({ json: { ai: false } }));
     await ready(page);
     await page.locator('#lang').selectOption('ta');
-    await expect(page.locator('#toast')).toContainText('needs the AI assistant');
+    await expect(page.locator('#toast')).toContainText('built-in translator');
     expect((await state(page)).lang).toBe('en');
   });
 
@@ -273,11 +286,46 @@ test.describe('Body Explorer', () => {
     await page.route('**/api/status', (r) => r.fulfill({ json: { ai: false } }));
     await ready(page);
     await page.locator('#ask-btn').click();
-    await expect(page.locator('#ask-status')).toHaveText('Offline answers');
+    await expect(page.locator('#ask-status')).toHaveText('Free built-in answers');
     await page.locator('#ask-input').fill('What does the liver do?');
     await page.locator('#ask-input').press('Enter');
     await expect(page.locator('.bubble.bot').last()).toContainText('cleans your blood');
-    await expect(page.locator('.bubble.bot').last()).toContainText('Offline answer');
+    await expect(page.locator('.bubble.bot').last()).toContainText('Built-in answer');
+    // "Why" questions come from the built-in question bank.
+    await page.locator('#ask-input').fill('Why does my heart beat faster when I run?');
+    await page.locator('#ask-input').press('Enter');
+    await expect(page.locator('.bubble.bot').last()).toContainText('muscles work hard and need lots of oxygen');
+    await page.locator('#ask-input').fill('Why do we hiccup?');
+    await page.locator('#ask-input').press('Enter');
+    await expect(page.locator('.bubble.bot').last()).toContainText('diaphragm');
+    expect(await lastSpoken(page)).toContain('diaphragm');
+  });
+
+  test('Ask in Hindi without the AI uses the Hindi question bank', async ({ page }) => {
+    await page.route('**/api/status', (r) => r.fulfill({ json: { ai: false } }));
+    await ready(page);
+    await page.locator('#lang').selectOption('hi');
+    await page.locator('#ask-btn').click();
+    await page.locator('#ask-input').fill('मुझे हिचकी क्यों आती है?');
+    await page.locator('#ask-input').press('Enter');
+    await expect(page.locator('.bubble.bot').last()).toContainText('डायाफ्राम');
+  });
+
+  test('Free translation: Chrome’s on-device translator handles other languages without a key', async ({ page }) => {
+    await fakeTranslator(page, true);
+    await page.route('**/api/status', (r) => r.fulfill({ json: { ai: false } }));
+    await page.route('**/api/translate', (r) => r.abort()); // must not be used
+    await ready(page);
+    await page.locator('#lang').selectOption('ta');
+    await expect(page.locator('#title')).toHaveText('[ta] Human Body');
+    await page.locator('.part-row').first().click();
+    await expect(page.locator('#detail-name')).toHaveText('[ta] Brain');
+    expect(await lastSpoken(page)).toContain('[ta] Did you know?');
+    // The free question bank is translated too.
+    await page.locator('#ask-btn').click();
+    await page.locator('#ask-input').fill('Why do we hiccup?');
+    await page.locator('#ask-input').press('Enter');
+    await expect(page.locator('.bubble.bot').last()).toContainText('[ta] Hiccups happen');
   });
 
   // ---------------------------------------------------------------- classroom

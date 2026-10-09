@@ -4,6 +4,7 @@
 
 import { LESSONS } from './content.js';
 import { HINDI } from './content.hi.js';
+import { deviceTranslate } from './device-translate.js';
 
 export const LANGS = {
   en: { name: 'English', native: 'English', speech: 'en-IN', short: 'EN', offline: true },
@@ -67,9 +68,9 @@ const UI = {
     askPlaceholder: 'Type a question…',
     listening: 'Listening…',
     thinking: 'Thinking…',
-    offlineAnswer: 'Offline answer',
     aiOn: 'AI ready',
-    aiOff: 'Offline answers',
+    builtIn: 'Built-in answer',
+    aiOff: 'Free built-in answers',
     noMic: 'Voice input is not available in this browser. Please type your question.',
     suggest1: 'What does the {part} do?',
     suggest2: 'Why does my heart beat faster when I run?',
@@ -83,7 +84,7 @@ const UI = {
     noCamera: 'No camera found',
     trackingFailed: 'Hand tracking could not load: check the internet connection',
     translating: 'Translating to {lang}…',
-    needsAi: '{lang} needs the AI assistant (add an API key). English and Hindi work offline.',
+    needsAi: '{lang} needs Chrome’s built-in translator (Chrome 138 or newer) or an AI key. English and Hindi always work.',
     noVoice: 'No {lang} voice on this device: showing text only. Install one in system settings.',
     saved: 'Saved',
     dashboard: 'Class Dashboard',
@@ -138,9 +139,9 @@ const UI = {
     askPlaceholder: 'अपना सवाल लिखें…',
     listening: 'सुन रहा है…',
     thinking: 'सोच रहा है…',
-    offlineAnswer: 'ऑफ़लाइन उत्तर',
     aiOn: 'AI तैयार',
-    aiOff: 'ऑफ़लाइन उत्तर',
+    builtIn: 'अंतर्निहित उत्तर',
+    aiOff: 'मुफ़्त अंतर्निहित उत्तर',
     noMic: 'इस ब्राउज़र में आवाज़ से पूछना उपलब्ध नहीं है। कृपया सवाल लिखें।',
     suggest1: '{part} क्या काम करता है?',
     suggest2: 'दौड़ते समय मेरा दिल तेज़ क्यों धड़कता है?',
@@ -154,7 +155,7 @@ const UI = {
     noCamera: 'कैमरा नहीं मिला',
     trackingFailed: 'हाथ ट्रैकिंग लोड नहीं हो सकी: इंटरनेट जाँचें',
     translating: '{lang} में अनुवाद हो रहा है…',
-    needsAi: '{lang} के लिए AI सहायक चाहिए। अंग्रेज़ी और हिंदी ऑफ़लाइन चलती हैं।',
+    needsAi: '{lang} के लिए Chrome का अनुवादक (Chrome 138+) या AI कुंजी चाहिए। अंग्रेज़ी और हिंदी हमेशा चलती हैं।',
     noVoice: 'इस डिवाइस पर {lang} आवाज़ नहीं है: केवल लिखा हुआ दिखेगा।',
     saved: 'सहेजा गया',
     dashboard: 'कक्षा डैशबोर्ड',
@@ -276,8 +277,11 @@ export class I18n {
     return !c[`${modelId}|intro`] || parts.some((p) => !c[`${modelId}|${p}|fact`]) || !c['say|canYouFind'];
   }
 
-  /** Fetches translations for one model (and the spoken phrases) from the server. */
-  async translateModel(modelId, englishTitle, englishSubtitle) {
+  /**
+   * Translates one model (and the spoken phrases) into the current language,
+   * with the AI assistant ('ai') or the browser's free on-device translator ('device').
+   */
+  async translateModel(modelId, englishTitle, englishSubtitle, engine = 'ai') {
     const lang = this.lang;
     const key = `${lang}:${modelId}`;
     if (this.pending.has(key)) return this.pending.get(key);
@@ -292,6 +296,20 @@ export class I18n {
       ]),
       ...Object.entries(SPEECH.en).map(([k, text]) => ({ key: `say|${k}`, text })),
     ];
+    if (engine === 'device') {
+      const job = deviceTranslate(lang, items.map((it) => it.text)).then((out) => {
+        const c = cacheFor(lang);
+        items.forEach((it, k) => {
+          // Spoken phrases must keep their {placeholders}; otherwise fall back to English.
+          const placeholders = it.text.match(/\{\w+\}/g) ?? [];
+          if (placeholders.every((p) => out[k].includes(p))) c[it.key] = out[k];
+        });
+        saveCache(lang);
+        return true;
+      }).finally(() => this.pending.delete(key));
+      this.pending.set(key, job);
+      return job;
+    }
     const job = fetch('/api/translate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

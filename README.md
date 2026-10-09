@@ -39,14 +39,28 @@ explorer for teachers to show children how the body works.
 
 | Feature | What it does |
 |---|---|
-| 🎤 **Ask Body Buddy** | Children ask a question by voice (or typing), e.g. *"Why does my heart beat faster when I run?"*. Claude answers in 2–4 child-friendly sentences, aware of the system and part on screen, and the answer is read aloud. Without an API key, answers come from the built-in lessons. |
-| 🌏 **Languages** | English and **Hindi** are hand-written and work offline (screen, narration, quizzes). Bengali, Tamil, Telugu, Marathi, Gujarati, Kannada, Malayalam and Punjabi are translated by Claude the first time a system is opened, then cached on the device. Narration uses the device's voice for that language. |
+| 🎤 **Ask Body Buddy** | Children ask a question by voice (or typing), e.g. *"Why does my heart beat faster when I run?"*, and hear the answer. Free: a built-in bank of common questions (English + Hindi). With an optional API key, Claude answers any question in 2–4 child-friendly sentences, aware of the part on screen. |
+| 🌏 **Languages** | English and **Hindi** are hand-written and work offline (screen, narration, quizzes). Bengali, Tamil, Telugu, Marathi, Gujarati, Kannada, Malayalam and Punjabi are translated free by Chrome’s on-device translator (or by Claude with a key) the first time a system is opened, then cached. Narration uses the device's voice for that language. |
 | 🏆 **Quizzes** | One player (pick a student from the class list) or **two teams** taking turns with a live scoreboard. Stars for a correct first try; gentle hints for wrong taps. |
 | 📊 **Class Dashboard** | Quizzes played, class average, top scorer, average by body system, most-missed parts, per-student history. **Print report** and **Export CSV**. Everything stays on the device. |
 | 📚 **My Lessons** | Teachers pick a system, choose and reorder parts, add notes and **record their own voice** for each step. Saved lessons appear in the sidebar. |
 | ♿ **Accessibility** | Large text, colour-blind friendly colours (a CVD-validated palette), reduce motion, and **switch scanning**: parts light up in turn and one key, switch or click chooses. |
 
-### Turning on the AI assistant
+### Free by default
+
+Everything works **free and offline without any API key**:
+
+- **Ask Body Buddy** answers from a built-in question bank (`src/body/faq.js`: 30 of
+  the questions children ask most, in English and Hindi) and from the lesson for
+  any body part the question names.
+- **Bengali, Tamil, Telugu, Marathi, Gujarati, Kannada, Malayalam, Punjabi** are
+  translated by **Chrome’s built-in on-device Translator** (Chrome 138+ on desktop):
+  the language pack downloads once, then everything is saved on the device.
+
+An Anthropic API key is optional: it upgrades Ask Body Buddy to open-ended AI
+answers and uses Claude for translation instead.
+
+### Turning on the AI assistant (optional, paid)
 
 1. Get an API key at https://console.anthropic.com/
 2. Copy `.env.example` to `.env` and paste the key after `ANTHROPIC_API_KEY=`
