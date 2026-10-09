@@ -6,7 +6,13 @@
 //   POST /api/ask        -> { answer }            child-friendly answer to a question
 //   POST /api/translate  -> { items: {key: text} } narration in another language
 
-import Anthropic from '@anthropic-ai/sdk';
+// The SDK is loaded lazily, only when an API key is configured, so the free
+// app starts even if the package has not been installed.
+let Anthropic = null;
+async function loadSdk() {
+  Anthropic ??= (await import('@anthropic-ai/sdk')).default;
+  return Anthropic;
+}
 
 const MODEL = 'claude-opus-5-5';
 
@@ -37,9 +43,20 @@ How to answer:
 - Never ask for personal information.`;
 
 let client = null;
+const hasKey = () => Boolean(process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN);
 function getClient() {
-  if (!process.env.ANTHROPIC_API_KEY && !process.env.ANTHROPIC_AUTH_TOKEN) return null;
-  client ??= new Anthropic();
+  return client;
+}
+async function initClient() {
+  if (!hasKey()) return null;
+  if (!client) {
+    try {
+      client = new (await loadSdk())();
+    } catch (err) {
+      console.warn('[assistant] @anthropic-ai/sdk is not installed: run `npm install` to use the AI assistant.');
+      return null;
+    }
+  }
   return client;
 }
 
@@ -160,14 +177,18 @@ export function assistantMiddleware() {
   return async (req, res, next) => {
     const path = (req.url ?? '').split('?')[0];
     try {
-      if (path === '/status' && req.method === 'GET') return send(res, 200, { ai: Boolean(getClient()), model: MODEL });
+      if (path === '/status' && req.method === 'GET') return send(res, 200, { ai: Boolean(await initClient()), model: MODEL });
       if (path !== '/ask' && path !== '/translate') return next();
       if (req.method !== 'POST') return send(res, 405, { error: 'Use POST' });
-      if (!getClient()) return send(res, 503, { error: 'AI assistant is not configured (set ANTHROPIC_API_KEY).' });
+      if (!(await initClient())) return send(res, 503, { error: 'AI assistant is not configured (set ANTHROPIC_API_KEY).' });
       const body = await readJson(req);
       const { status, data } = path === '/ask' ? await ask(body) : await translate(body);
       return send(res, status, data);
     } catch (err) {
+      if (!Anthropic) {
+        console.error('[assistant]', err);
+        return send(res, 500, { error: 'Something went wrong.' });
+      }
       if (err instanceof Anthropic.AuthenticationError) return send(res, 503, { error: 'The API key was rejected.' });
       if (err instanceof Anthropic.RateLimitError) return send(res, 429, { error: 'Too many questions right now, try again in a moment.' });
       if (err instanceof Anthropic.APIError) return send(res, 502, { error: `AI service error (${err.status ?? 'network'}).` });
