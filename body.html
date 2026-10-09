@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#000000" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="description" content="Body Explorer: an interactive 3D human body for the classroom, with spoken explanations and fun facts." />
+    <title>Body Explorer</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23ff6b8b'/%3E%3Cstop offset='1' stop-color='%23bf5af2'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='15' fill='url(%23g)'/%3E%3Cpath d='M32 50s-15-9-15-20a8 8 0 0 1 15-4 8 8 0 0 1 15 4c0 11-15 20-15 20z' fill='white'/%3E%3C/svg%3E" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" />
+    <link rel="stylesheet" href="/src/body/body.css" />
+  </head>
+  <body>
+    <div class="app">
+      <!-- ============ Sidebar ============ -->
+      <aside class="sidebar" id="sidebar">
+        <div class="sb-top">
+          <div class="app-mark" aria-hidden="true"><span>♥</span></div>
+          <button class="icon-btn close-sidebar" id="close-sidebar" aria-label="Close sidebar">
+            <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" /></svg>
+          </button>
+        </div>
+        <h1 class="large-title">Body Explorer</h1>
+        <label class="search">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="M16 16l4 4" /></svg>
+          <input id="search" type="search" placeholder="Search parts and systems" autocomplete="off" />
+        </label>
+        <nav id="systems" aria-label="Body systems"></nav>
+        <p class="sb-foot">Tap any part to hear its name, what it does and a fun fact.</p>
+      </aside>
+
+      <!-- ============ Stage ============ -->
+      <main class="stage" id="stage">
+        <canvas id="gl" aria-label="3D model"></canvas>
+        <svg id="leaders" aria-hidden="true"></svg>
+        <div id="labels" aria-hidden="true"></div>
+        <canvas id="overlay" aria-hidden="true"></canvas>
+
+        <header class="navbar">
+          <button class="icon-btn menu-btn" id="open-sidebar" aria-label="Show body systems">
+            <svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="14" rx="3" /><path d="M9.5 5v14" /></svg>
+          </button>
+          <div class="titles">
+            <p class="eyebrow" id="eyebrow">Whole Body</p>
+            <h2 id="title">Loading…</h2>
+            <p class="subtitle" id="subtitle"></p>
+          </div>
+          <div class="nav-actions">
+            <div class="segmented" id="view-seg" role="radiogroup" aria-label="View">
+              <span class="seg-thumb"></span>
+              <button role="radio" data-explode="0" aria-checked="true">Together</button>
+              <button role="radio" data-explode="0.5" aria-checked="false">Peek</button>
+              <button role="radio" data-explode="1" aria-checked="false">Apart</button>
+            </div>
+            <button class="icon-btn" id="sound-btn" aria-label="Narration on" title="Narration">
+              <svg class="on" viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 6v12l-4.5-3.5H4z" /><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11" /></svg>
+              <svg class="off" viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 6v12l-4.5-3.5H4z" /><path d="M16 10l4 4M20 10l-4 4" /></svg>
+            </button>
+            <button class="icon-btn" id="hands-btn" aria-label="Hand control" title="Hand control (camera)">
+              <svg viewBox="0 0 24 24"><path d="M8 12V6.5a1.5 1.5 0 0 1 3 0V11M11 10.5V5a1.5 1.5 0 0 1 3 0v6M14 10.5V6.5a1.5 1.5 0 0 1 3 0V14c0 3.5-2.5 6-6 6-2.5 0-4-1.2-5.2-3L4 14a1.5 1.5 0 0 1 2.4-1.8L8 14" /></svg>
+            </button>
+            <button class="icon-btn" id="settings-btn" aria-label="Settings" title="Settings">
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" /><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M5.6 18.4l1.8-1.8M16.6 7.4l1.8-1.8" /></svg>
+            </button>
+          </div>
+        </header>
+
+        <video id="video" class="pip" playsinline muted hidden></video>
+
+        <aside class="inspector" id="inspector" aria-label="Parts">
+          <h3 class="section-header">Parts <span id="part-count"></span></h3>
+          <ul class="inset-group" id="part-list"></ul>
+        </aside>
+
+        <section class="detail" id="detail" hidden aria-live="polite">
+          <div class="detail-head">
+            <span class="dot" id="detail-dot"></span>
+            <div>
+              <p class="eyebrow" id="detail-eyebrow">Part</p>
+              <h3 id="detail-name"></h3>
+            </div>
+            <button class="round-btn" id="listen-btn" aria-label="Listen again" title="Listen again">
+              <svg viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 6v12l-4.5-3.5H4z" /><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11" /></svg>
+            </button>
+          </div>
+          <p class="detail-summary" id="detail-summary"></p>
+          <div class="fact">
+            <span class="fact-badge">💡 Did you know?</span>
+            <p id="detail-fact"></p>
+          </div>
+          <div class="detail-nav">
+            <button class="text-btn" id="prev-part">‹ Previous</button>
+            <span class="speaking" id="speaking" hidden><i></i><i></i><i></i> Speaking</span>
+            <button class="text-btn" id="next-part">Next ›</button>
+          </div>
+        </section>
+
+        <div class="quiz-banner" id="quiz-banner" hidden>
+          <p class="eyebrow" id="quiz-progress">Question 1 of 5</p>
+          <h3 id="quiz-question">Can you find the heart?</h3>
+          <p class="quiz-feedback" id="quiz-feedback"></p>
+        </div>
+
+        <footer class="toolbar">
+          <div class="toolbar-pill" id="toolbar-idle">
+            <button class="btn-filled" id="lesson-btn">
+              <svg viewBox="0 0 24 24"><path d="M8 5.5v13l10-6.5z" /></svg> Start Lesson
+            </button>
+            <button class="btn-tinted" id="quiz-btn">🎯 Quiz</button>
+          </div>
+          <div class="toolbar-pill" id="toolbar-lesson" hidden>
+            <span class="lesson-progress"><b id="lesson-step">1</b> of <span id="lesson-total">1</span></span>
+            <div class="progress"><i id="lesson-bar"></i></div>
+            <button class="btn-tinted" id="lesson-pause">Pause</button>
+            <button class="btn-plain" id="lesson-stop">End</button>
+          </div>
+          <div class="toolbar-pill" id="toolbar-quiz" hidden>
+            <span class="score" id="quiz-score">⭐️ 0</span>
+            <button class="btn-tinted" id="quiz-skip">Skip</button>
+            <button class="btn-plain" id="quiz-stop">End Quiz</button>
+          </div>
+        </footer>
+
+        <div class="toast" id="toast" role="status"></div>
+      </main>
+    </div>
+
+    <!-- ============ Settings sheet ============ -->
+    <div class="modal" id="settings" hidden>
+      <div class="sheet-card" role="dialog" aria-labelledby="settings-title">
+        <div class="sheet-bar">
+          <span></span>
+          <h3 id="settings-title">Settings</h3>
+          <button class="text-btn bold" id="settings-done">Done</button>
+        </div>
+        <h4 class="section-header">Narration</h4>
+        <ul class="inset-group form">
+          <li><label for="auto-read">Read parts aloud</label><input type="checkbox" class="switch" id="auto-read" checked /></li>
+          <li><label for="voice">Voice</label><select id="voice"></select></li>
+          <li><label for="rate">Speed</label><input type="range" id="rate" min="0.7" max="1.2" step="0.05" value="0.95" /></li>
+          <li><button class="text-btn" id="test-voice">Test voice</button></li>
+        </ul>
+        <h4 class="section-header">Display</h4>
+        <ul class="inset-group form">
+          <li><label for="show-labels">Labels on the model</label><input type="checkbox" class="switch" id="show-labels" checked /></li>
+          <li><label for="auto-rotate">Gently rotate</label><input type="checkbox" class="switch" id="auto-rotate" checked /></li>
+          <li>
+            <label>Detail</label>
+            <div class="segmented small" id="quality-seg">
+              <span class="seg-thumb"></span>
+              <button data-particles="60000">Light</button>
+              <button data-particles="150000">Standard</button>
+              <button data-particles="300000">Rich</button>
+            </div>
+          </li>
+        </ul>
+        <h4 class="section-header">Hand control</h4>
+        <ul class="inset-group form info">
+          <li>☝️ <span><b>Point</b> at a part and hold to hear about it</span></li>
+          <li>🖐️ <span><b>Open your hand</b> to take the body apart</span></li>
+          <li>✊ <span><b>Make a fist</b> to put it back together</span></li>
+          <li>✌️ <span><b>Peace sign</b> for the next part</span></li>
+          <li>🔄 <span><b>Twist your wrist</b> to turn the model</span></li>
+        </ul>
+        <p class="footnote">The camera picture stays on this device. Nothing is uploaded.</p>
+      </div>
+    </div>
+
+    <!-- ============ Welcome ============ -->
+    <div class="welcome" id="welcome">
+      <div class="welcome-card">
+        <div class="app-icon" aria-hidden="true"><span>♥</span></div>
+        <h1>Body Explorer</h1>
+        <p class="welcome-sub">Discover how your amazing body works.</p>
+        <ul class="features">
+          <li><span class="f-icon" style="--tint:#ff375f">🫀</span><div><b>13 body systems &amp; organs</b><p>From the skeleton to the brain, in 3D.</p></div></li>
+          <li><span class="f-icon" style="--tint:#0a84ff">🔊</span><div><b>Hear every part</b><p>Names, what they do and a fun fact, read aloud.</p></div></li>
+          <li><span class="f-icon" style="--tint:#30d158">🎓</span><div><b>Lessons &amp; quizzes</b><p>Guided tours and "find the part" games for the class.</p></div></li>
+        </ul>
+        <button class="btn-filled wide" id="get-started">Get Started</button>
+      </div>
+    </div>
+
+    <script type="module" src="/src/body/app.js"></script>
+  </body>
+</html>

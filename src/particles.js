@@ -92,7 +92,7 @@ void main() {
   gl_Position = uProj * vp;
   bool hot = uHover >= 0.0 && abs(aPart - uHover) < 0.5;
   float dim = (uHover >= 0.0 && !hot) ? mix(1.0, 0.3, uFocus) : 1.0;
-  float boost = hot ? 1.0 + 0.9 * uFocus : 1.0;
+  float boost = hot ? 1.0 + 0.55 * uFocus : 1.0;
   vec3 col = mix(vec3(0.75, 0.85, 1.0), aCol, clamp(uForm * 1.3, 0.0, 1.0));
   vCol = col * dim * boost;
   vGlow = hot ? uFocus : 0.0;

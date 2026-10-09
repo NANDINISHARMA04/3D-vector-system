@@ -1,5 +1,5 @@
 import {
-  ellipsoid, sphere, tube, curve, revolve, disk, torus, both, fuzz, mulberry32,
+  ellipsoid, sphere, tube, curve, revolve, disk, torus, both, fuzz, group, mulberry32,
 } from '../shapes.js';
 import { part, range } from './common.js';
 
@@ -358,4 +358,73 @@ const skull = {
   },
 };
 
-export default [brain, heart, kidney, lungs, eye, ear, tooth, skull, skeleton, humanBody];
+// Head + torso only: context for systems that live in the trunk.
+function torsoShapes() {
+  return [
+    ellipsoid([0, 16.6, 0.05], [1.05, 1.3, 1.15]),
+    tube([0, 15.0, 0], [0, 15.6, 0], 0.55, 0.5),
+    ellipsoid([0, 12.4, 0], [2.25, 2.9, 1.25]),
+    ellipsoid([0, 9.6, 0], [2.0, 1.35, 1.15], { where: (p) => p[1] > 8.6 }),
+  ];
+}
+
+const circulatory = {
+  id: 'circulatory',
+  name: 'Circulatory System',
+  category: CAT,
+  subtitle: 'heart, blood and 100,000 km of vessels',
+  build() {
+    return [
+      part('Heart', 'the pump at the centre', '#ff4d5e', ellipsoid([0.3, 12.55, 0.45], [0.55, 0.65, 0.5]), { explode: [0, 1.6, 2.2] }),
+      part('Arteries', 'carry blood away from the heart', '#ff5a6a', arteryPaths(), { explode: [-3.2, 0, 0], density: 1.2 }),
+      part('Veins', 'carry blood back to the heart', '#5f8dff', arteryPaths(0.18, -0.15), { explode: [3.2, 0, 0], density: 1.2 }),
+      part('Lungs', 'where blood picks up oxygen', '#9cd7ff', both((s) => ellipsoid([s * 0.9, 13.1, -0.1], [0.7, 1.3, 0.65])), { explode: [0, 1.2, -1.6], spread: 0.6, density: 0.6 }),
+      part('Capillaries', 'tiny tubes reaching every cell', '#ff9fb0', fuzz(group(skinShapes()), 0.08), { explode: [6.8, 0, 0], density: 0.3 }),
+    ];
+  },
+};
+
+const digestive = {
+  id: 'digestive',
+  name: 'Digestive System',
+  category: CAT,
+  subtitle: 'a 9-metre food journey',
+  build() {
+    const [small, colon] = intestines();
+    return [
+      part('Mouth', 'where digestion begins', '#ff8fa3', [ellipsoid([0, 15.95, 0.95], [0.38, 0.14, 0.2]), torus([0, 15.95, 1.0], 'z', 0.3, 0.06)], { explode: [0, 1.4, 1.2] }),
+      part('Salivary glands', 'make spit to soften food', '#ffd6a5', both((s) => ellipsoid([s * 0.62, 15.8, 0.35], [0.22, 0.3, 0.2])), { explode: [0, 1.2, 0.4], spread: 0.6 }),
+      part('Oesophagus', 'food pipe to the stomach', '#ffb36b', curve([[0, 15.4, 0.3], [0, 14.2, 0.0], [0.05, 12.6, -0.1], [0.45, 11.6, 0.2]], 0.12), { explode: [-2.0, 0.6, 0.8] }),
+      part('Stomach', 'churns food into soup', '#ff9f43', ellipsoid([0.85, 11.0, 0.35], [0.7, 0.55, 0.5]), { explode: [2.2, 0.4, 1.2] }),
+      part('Liver', 'cleans blood and makes bile', '#d8705a', ellipsoid([-0.7, 11.3, 0.2], [1.2, 0.6, 0.8]), { explode: [-2.4, 0.4, 1.2] }),
+      part('Gallbladder', 'stores bile for fatty food', '#7fd18b', ellipsoid([-0.45, 10.75, 0.75], [0.15, 0.22, 0.15]), { explode: [-1.4, -0.4, 2.2] }),
+      part('Pancreas', 'makes juices and insulin', '#ffe08a', curve([[-0.3, 10.6, -0.15], [0.3, 10.55, -0.2], [1.0, 10.7, -0.25]], 0.16, { r1: 0.08 }), { explode: [1.8, -0.2, 2.0] }),
+      part('Small intestine', 'soaks up the nutrients', '#ffc4d6', small, { explode: [0, -1.4, 2.0] }),
+      part('Large intestine', 'takes back water', '#c39bff', [colon, tube([0.3, 8.6, 0.3], [0, 7.9, -0.1], 0.18)], { explode: [0, -1.0, -0.6], spread: 0.3 }),
+      part('Body', 'your digestive system fits in here', '#e8b9a0', torsoShapes(), { explode: [0, 0, -1.2], density: 0.25 }),
+    ];
+  },
+};
+
+const nervous = {
+  id: 'nervous',
+  name: 'Nervous System',
+  category: CAT,
+  subtitle: 'the body’s super-fast messaging network',
+  build() {
+    const limbNerves = (pts, s) => curve(pts.map(([x, y, z]) => [s * x, y, z]), 0.05);
+    const fingers = (s) => range(5, (f) => curve([[s * 3.35, 8.1, 0.05], [s * (3.45 + (f - 2) * 0.05), 7.4, 0.05 + (f - 2) * 0.12], [s * (3.5 + (f - 2) * 0.06), 6.9, 0.1 + (f - 2) * 0.16]], 0.025));
+    const toes = (s) => range(5, (t) => curve([[s * 1.22, 0.6, 0], [s * (1.05 + t * 0.09), 0.25, 1.1 - t * 0.08]], 0.025));
+    return [
+      part('Brain', 'the control centre', '#ff9ad5', ellipsoid([0, 16.95, 0], [0.85, 0.7, 1.0], { wrinkle: 0.06 }), { explode: [0, 2.4, 0] }),
+      part('Cerebellum', 'keeps you balanced', '#ffd166', ellipsoid([0, 16.15, -0.65], [0.55, 0.28, 0.35], { wrinkle: 0.04 }), { explode: [0, 1.6, -1.4] }),
+      part('Spinal cord', 'the main message highway', '#ffe66d', curve([[0, 16.0, -0.3], [0, 15.2, -0.4], [0, 13.0, -0.5], [0, 11.0, -0.35], [0, 9.3, -0.45]], 0.1), { explode: [0, 0.6, -1.8] }),
+      part('Arm nerves', 'carry touch from your hands', '#7fd1ff', both((s) => [limbNerves([[0, 14.0, -0.4], [1.2, 14.0, -0.1], [2.3, 13.8, -0.05], [2.9, 11.0, -0.1], [3.35, 8.1, 0.05]], s), fingers(s)]), { explode: [0, 0.4, 0], spread: 0.35 }),
+      part('Leg nerves', 'the longest nerves in the body', '#4fd1a5', both((s) => [limbNerves([[0, 9.4, -0.4], [0.8, 8.7, -0.3], [1.0, 6.5, -0.25], [1.15, 4.5, -0.2], [1.22, 0.6, 0]], s), toes(s)]), { explode: [0, -0.8, 0], spread: 0.25 }),
+      part('Rib nerves', 'help you breathe and feel your chest', '#c3a6ff', both((s) => range(8, (i) => curve([[0, 14.0 - i * 0.5, -0.45], [s * 1.1, 13.9 - i * 0.5, 0.0], [s * 1.6, 13.7 - i * 0.52, 0.55], [s * 0.6, 13.6 - i * 0.55, 1.05]], 0.03))), { explode: [0, 0, 1.6], spread: 0.15 }),
+      part('Body', 'nerves reach every part of you', '#e8b9a0', skinShapes(), { explode: [0, 0, -1.2], density: 0.25 }),
+    ];
+  },
+};
+
+export default [brain, heart, kidney, lungs, eye, ear, tooth, skull, skeleton, humanBody, circulatory, digestive, nervous];

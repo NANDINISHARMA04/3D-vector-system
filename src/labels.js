@@ -44,7 +44,7 @@ export class Labels {
    * @param {[number,number,number]} span model centre x and its left/right screen extent
    * @param {object} o { opacity, hot, width, height, leftLimit }
    */
-  layout(anchors, [cx, minX, maxX], { opacity, hot, width, height, leftLimit = 0 }) {
+  layout(anchors, [cx, minX, maxX], { opacity, hot, width, height, leftLimit = 0, leftBottom = height - 120, top = null }) {
     const vis = opacity > 0.01;
     this.container.style.opacity = vis ? 1 : 0;
     this.svg.style.opacity = vis ? 1 : 0;
@@ -70,12 +70,12 @@ export class Labels {
         y = it.y;
       }
       // Pull the column back on screen if it overflows the bottom.
-      const overflow = y + 40 - (height - 120);
+      const overflow = y + 40 - (side === 'left' ? leftBottom : height - 120);
       if (overflow > 0) for (const it of list) it.y -= overflow;
       // Re-stack after clamping to the top so nothing overlaps.
       let prev = -Infinity;
       for (const it of list) {
-        it.y = Math.max(side === 'left' ? 70 : 150, it.y, prev + Math.max(GAP, it.h + 4));
+        it.y = Math.max(top ?? (side === 'left' ? 70 : 150), it.y, prev + Math.max(GAP, it.h + 4));
         prev = it.y;
         if (side === 'left') it.x = Math.max(leftLimit + 8, edge - it.w);
         else it.x = Math.min(width - it.w - 10, edge);

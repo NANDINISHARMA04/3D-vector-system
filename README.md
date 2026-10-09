@@ -9,6 +9,30 @@ particles that assemble into anatomy, landmarks, engines, vehicles and machines.
 
 ![Exploded human body](docs/screenshot.png)
 
+## Body Explorer (for classrooms)
+
+`body.html` is a second app built on the same engine: an iPad-style human-body
+explorer for teachers to show children how the body works.
+
+![Body Explorer](docs/body-explorer.png)
+
+- **13 body systems and organs**: whole body; skeletal, circulatory, respiratory,
+  digestive, nervous and urinary systems; brain, heart, eye, ear, tooth and skull.
+- **Spoken narration**: tap a part (on the model or in the Parts list) and it is read
+  aloud: name, what it does and a fun fact. Uses the browser's built-in speech, so it
+  works offline. Voice and speed are in Settings; the speaker button mutes it.
+- **Start Lesson**: a guided tour that highlights and narrates every part in turn
+  (pause / resume / end).
+- **Quiz**: "Can you find the heart?" Five questions per round, with gentle hints for
+  wrong answers, a star score and confetti.
+- **Together / Peek / Apart** segmented control to take the model apart.
+- **Optional hand control**: point and hold at a part, open hand to take it apart,
+  fist to put it back, peace sign for the next part, twist to rotate.
+- Works on laptops, interactive whiteboards, iPads and phones (the sidebar collapses).
+
+Open http://localhost:5173/body.html after `npm run dev`. Narration text lives in
+`src/body/content.js`, so teachers can edit or translate it.
+
 ## Quick start
 
 ```bash
@@ -80,10 +104,10 @@ webcam ──► MediaPipe Hand Landmarker (GPU) ──► 21 landmarks / hand
   to index knuckle vs palm width, pinch distance vs palm length), with a
   sensitivity setting that shifts all thresholds.
 
-## Models (31)
+## Models (34)
 
 - **Wonders** — Great Pyramid, Eiffel Tower, Taj Mahal, Colosseum, Stonehenge, Leaning Tower of Pisa, Great Wall, Saturn, Solar System
-- **Anatomy** — Human Brain, Human Heart, Kidney, Lungs, Human Eye, Human Ear, Tooth (Molar), Skull, Skeleton, Human Body
+- **Anatomy** — Human Brain, Human Heart, Kidney, Lungs, Human Eye, Human Ear, Tooth (Molar), Skull, Skeleton, Human Body, Circulatory System, Digestive System, Nervous System
 - **Biology** — DNA Double Helix, Animal Cell
 - **Engines** — Jet Engine, Inline-4 Engine, Rocket Engine, Electric Motor
 - **Vehicles** — Sports Car, Saturn V, Airliner, Bicycle
@@ -94,8 +118,8 @@ Add your own in `src/models/` — a model is a `build()` that returns parts made
 ## Tests
 
 ```bash
-npm run test:unit   # node:test — gesture classification, tracker timing, every model samples cleanly
-npm run test:e2e    # Playwright — boots the app with software WebGL2 and drives it with synthetic hands
+npm run test:unit   # node:test — gestures, tracker timing, every model samples cleanly, every lesson part has narration
+npm run test:e2e    # Playwright — both apps with software WebGL2: taps, lessons, quiz, search, synthetic hands
 npm test            # both
 ```
 
@@ -117,6 +141,9 @@ src/overlay.js        hand skeleton and pose ring overlay
 src/shapes.js         procedural surface samplers
 src/models/           model catalogue by category
 src/sampler.worker.js off-main-thread model sampling
+src/viewer.js         camera, projection and picking helpers
+body.html             Body Explorer page
+src/body/             Body Explorer app, narration content, speech, styles
 tests/unit, tests/e2e
 ```
 

@@ -335,7 +335,8 @@ export function custom(area, sample) {
 }
 
 // Union of shapes, sampled proportionally to area.
-export function group(shapes) {
+export function group(list) {
+  const shapes = list.flat(Infinity);
   const cum = [];
   let total = 0;
   for (const s of shapes) cum.push((total += s.area));
