@@ -233,6 +233,13 @@ export class ParticleSystem {
     upload(this.partBuf, sample.partIds);
   }
 
+  /** Re-colours the current model (e.g. colour-blind friendly palette). */
+  setColors(colors) {
+    const { gl } = this;
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.colorBuf);
+    gl.bufferSubData(gl.ARRAY_BUFFER, 0, colors);
+  }
+
   resize(width, height, dpr) {
     const w = Math.round(width * dpr);
     const h = Math.round(height * dpr);

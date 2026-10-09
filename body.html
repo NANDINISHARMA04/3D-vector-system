@@ -26,10 +26,15 @@
         <h1 class="large-title">Body Explorer</h1>
         <label class="search">
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="M16 16l4 4" /></svg>
-          <input id="search" type="search" placeholder="Search parts and systems" autocomplete="off" />
+          <input id="search" type="search" placeholder="Search parts and systems" data-i18n-placeholder="search" autocomplete="off" />
         </label>
         <nav id="systems" aria-label="Body systems"></nav>
-        <p class="sb-foot">Tap any part to hear its name, what it does and a fun fact.</p>
+        <h3 class="section-header" data-i18n="section.Teacher tools">Teacher tools</h3>
+        <ul class="inset-group teacher-tools">
+          <li><button class="row" id="open-dashboard"><span class="icon" style="--tint:#30d158">📊</span><span class="row-text"><b data-i18n="dashboard">Class Dashboard</b><small>Scores, students &amp; reports</small></span></button></li>
+          <li><button class="row" id="open-builder"><span class="icon" style="--tint:#5e5ce6">📚</span><span class="row-text"><b data-i18n="lessons">My Lessons</b><small>Build lessons with your voice</small></span></button></li>
+        </ul>
+        <p class="sb-foot" data-i18n="sbFoot">Tap any part to hear its name, what it does and a fun fact.</p>
       </aside>
 
       <!-- ============ Stage ============ -->
@@ -51,10 +56,18 @@
           <div class="nav-actions">
             <div class="segmented" id="view-seg" role="radiogroup" aria-label="View">
               <span class="seg-thumb"></span>
-              <button role="radio" data-explode="0" aria-checked="true">Together</button>
-              <button role="radio" data-explode="0.5" aria-checked="false">Peek</button>
-              <button role="radio" data-explode="1" aria-checked="false">Apart</button>
+              <button role="radio" data-explode="0" aria-checked="true" data-i18n="together">Together</button>
+              <button role="radio" data-explode="0.5" aria-checked="false" data-i18n="peek">Peek</button>
+              <button role="radio" data-explode="1" aria-checked="false" data-i18n="apart">Apart</button>
             </div>
+            <label class="lang-pill" title="Language">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3z" /></svg>
+              <select id="lang" aria-label="Language"></select>
+            </label>
+            <button class="ask-btn" id="ask-btn" title="Ask a question">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21" /></svg>
+              <span data-i18n="ask">Ask</span>
+            </button>
             <button class="icon-btn" id="sound-btn" aria-label="Narration on" title="Narration">
               <svg class="on" viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 6v12l-4.5-3.5H4z" /><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11" /></svg>
               <svg class="off" viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 6v12l-4.5-3.5H4z" /><path d="M16 10l4 4M20 10l-4 4" /></svg>
@@ -80,7 +93,7 @@
         </div>
 
         <aside class="inspector" id="inspector" aria-label="Parts">
-          <h3 class="section-header">Parts <span id="part-count"></span></h3>
+          <h3 class="section-header"><span data-i18n="parts">Parts</span> <span id="part-count"></span></h3>
           <ul class="inset-group" id="part-list"></ul>
         </aside>
 
@@ -97,17 +110,22 @@
           </div>
           <p class="detail-summary" id="detail-summary"></p>
           <div class="fact">
-            <span class="fact-badge">💡 Did you know?</span>
+            <span class="fact-badge" data-i18n="didYouKnow">💡 Did you know?</span>
             <p id="detail-fact"></p>
           </div>
+          <div class="fact note" id="detail-note" hidden>
+            <span class="fact-badge" data-i18n="teacherNote">🧑‍🏫 Teacher’s note</span>
+            <p id="detail-note-text"></p>
+          </div>
           <div class="detail-nav">
-            <button class="text-btn" id="prev-part">‹ Previous</button>
-            <span class="speaking" id="speaking" hidden><i></i><i></i><i></i> Speaking</span>
-            <button class="text-btn" id="next-part">Next ›</button>
+            <button class="text-btn" id="prev-part" data-i18n="previous">‹ Previous</button>
+            <span class="speaking" id="speaking" hidden><i></i><i></i><i></i> <span data-i18n="speaking">Speaking</span></span>
+            <button class="text-btn" id="next-part" data-i18n="next">Next ›</button>
           </div>
         </section>
 
         <div class="quiz-banner" id="quiz-banner" hidden>
+          <div class="team-board" id="team-board" hidden></div>
           <p class="eyebrow" id="quiz-progress">Question 1 of 5</p>
           <h3 id="quiz-question">Can you find the heart?</h3>
           <p class="quiz-feedback" id="quiz-feedback"></p>
@@ -116,23 +134,24 @@
         <footer class="toolbar">
           <div class="toolbar-pill" id="toolbar-idle">
             <button class="btn-filled" id="lesson-btn">
-              <svg viewBox="0 0 24 24"><path d="M8 5.5v13l10-6.5z" /></svg> Start Lesson
+              <svg viewBox="0 0 24 24"><path d="M8 5.5v13l10-6.5z" /></svg> <span data-i18n="startLesson">Start Lesson</span>
             </button>
-            <button class="btn-tinted" id="quiz-btn">🎯 Quiz</button>
+            <button class="btn-tinted" id="quiz-btn" data-i18n="quiz">🎯 Quiz</button>
           </div>
           <div class="toolbar-pill" id="toolbar-lesson" hidden>
             <span class="lesson-progress"><b id="lesson-step">1</b> of <span id="lesson-total">1</span></span>
             <div class="progress"><i id="lesson-bar"></i></div>
-            <button class="btn-tinted" id="lesson-pause">Pause</button>
-            <button class="btn-plain" id="lesson-stop">End</button>
+            <button class="btn-tinted" id="lesson-pause" data-i18n="pause">Pause</button>
+            <button class="btn-plain" id="lesson-stop" data-i18n="end">End</button>
           </div>
           <div class="toolbar-pill" id="toolbar-quiz" hidden>
             <span class="score" id="quiz-score">⭐️ 0</span>
-            <button class="btn-tinted" id="quiz-skip">Skip</button>
-            <button class="btn-plain" id="quiz-stop">End Quiz</button>
+            <button class="btn-tinted" id="quiz-skip" data-i18n="skip">Skip</button>
+            <button class="btn-plain" id="quiz-stop" data-i18n="endQuiz">End Quiz</button>
           </div>
         </footer>
 
+        <div class="scan-hint" id="scan-hint" hidden>⏯ Switch scanning: press <kbd>Space</kbd> or <kbd>Enter</kbd> to choose the highlighted part</div>
         <div class="toast" id="toast" role="status"></div>
       </main>
     </div>
@@ -145,6 +164,11 @@
           <h3 id="settings-title">Settings</h3>
           <button class="text-btn bold" id="settings-done">Done</button>
         </div>
+        <h4 class="section-header">Language</h4>
+        <ul class="inset-group form">
+          <li><label for="lang-settings">Narration &amp; screen language</label><select id="lang-settings"></select></li>
+        </ul>
+        <p class="footnote" id="lang-note">English and Hindi are built in. Other Indian languages are translated by the AI assistant the first time and then saved on this device.</p>
         <h4 class="section-header">Narration</h4>
         <ul class="inset-group form">
           <li><label for="auto-read">Read parts aloud</label><input type="checkbox" class="switch" id="auto-read" checked /></li>
@@ -166,6 +190,22 @@
             </div>
           </li>
         </ul>
+        <h4 class="section-header">Accessibility</h4>
+        <ul class="inset-group form">
+          <li><label for="a11y-large">Large text</label><input type="checkbox" class="switch" id="a11y-large" /></li>
+          <li><label for="a11y-cb">Colour-blind friendly colours</label><input type="checkbox" class="switch" id="a11y-cb" /></li>
+          <li><label for="a11y-motion">Reduce motion</label><input type="checkbox" class="switch" id="a11y-motion" /></li>
+          <li><label for="a11y-scan">Switch scanning <small>parts light up in turn; one key or switch picks</small></label><input type="checkbox" class="switch" id="a11y-scan" /></li>
+          <li>
+            <label>Scanning speed</label>
+            <div class="segmented small" id="scan-seg">
+              <span class="seg-thumb"></span>
+              <button data-ms="1500">Fast</button>
+              <button data-ms="2500">Medium</button>
+              <button data-ms="4000">Slow</button>
+            </div>
+          </li>
+        </ul>
         <h4 class="section-header">Hand control</h4>
         <ul class="inset-group form">
           <li><label for="camera-bg">Show camera behind the model</label><input type="checkbox" class="switch" id="camera-bg" checked /></li>
@@ -183,6 +223,88 @@
       </div>
     </div>
 
+    <!-- ============ Ask Body Buddy ============ -->
+    <div class="modal" id="ask" hidden>
+      <div class="sheet-card ask-card" role="dialog" aria-labelledby="ask-title">
+        <div class="sheet-bar">
+          <span class="ai-status" id="ask-status"></span>
+          <h3 id="ask-title" data-i18n="askTitle">Ask Body Buddy</h3>
+          <button class="text-btn bold" id="ask-close" data-i18n="done">Done</button>
+        </div>
+        <div class="ask-log" id="ask-log" aria-live="polite"></div>
+        <div class="ask-suggest" id="ask-suggest"></div>
+        <form class="ask-form" id="ask-form">
+          <button type="button" class="mic" id="ask-mic" aria-label="Speak your question">
+            <svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21" /></svg>
+          </button>
+          <input id="ask-input" maxlength="400" autocomplete="off" placeholder="Type a question…" data-i18n-placeholder="askPlaceholder" />
+          <button type="submit" class="round-btn" aria-label="Send"><svg viewBox="0 0 24 24"><path d="M5 12h13M13 6l6 6-6 6" /></svg></button>
+        </form>
+      </div>
+    </div>
+
+    <!-- ============ Quiz setup ============ -->
+    <div class="modal" id="quiz-setup" hidden>
+      <div class="sheet-card" role="dialog" aria-labelledby="qs-title">
+        <div class="sheet-bar">
+          <button class="text-btn" id="qs-cancel">Cancel</button>
+          <h3 id="qs-title">New Quiz</h3>
+          <button class="text-btn bold" id="qs-start">Start</button>
+        </div>
+        <div class="segmented wide-seg" id="qs-mode">
+          <span class="seg-thumb"></span>
+          <button data-mode="solo">🙋 One player</button>
+          <button data-mode="teams">🏆 Two teams</button>
+        </div>
+        <div id="qs-solo">
+          <h4 class="section-header">Who is playing?</h4>
+          <ul class="inset-group list" id="qs-players"></ul>
+          <form class="add-row" id="qs-add"><input id="qs-new" placeholder="New student’s name" maxlength="40" autocomplete="off" /><button class="btn-tinted" type="submit">Add</button></form>
+        </div>
+        <div id="qs-teams" hidden>
+          <h4 class="section-header">Teams take turns. The first try scores a point.</h4>
+          <ul class="inset-group form" id="qs-team-names"></ul>
+        </div>
+        <h4 class="section-header">Questions</h4>
+        <div class="segmented wide-seg" id="qs-count">
+          <span class="seg-thumb"></span>
+          <button data-n="5">5</button>
+          <button data-n="10">10</button>
+          <button data-n="0">All parts</button>
+        </div>
+        <p class="footnote">Results are saved to the Class Dashboard on this device.</p>
+      </div>
+    </div>
+
+    <!-- ============ Dashboard ============ -->
+    <div class="modal" id="dashboard" hidden>
+      <div class="sheet-card wide" role="dialog" aria-labelledby="dash-title">
+        <div class="sheet-bar">
+          <span class="bar-actions"><button class="text-btn" id="dash-print">Print report</button><button class="text-btn" id="dash-csv">Export CSV</button></span>
+          <h3 id="dash-title" data-i18n="dashboard">Class Dashboard</h3>
+          <button class="text-btn bold" id="dash-done" data-i18n="done">Done</button>
+        </div>
+        <div class="segmented wide-seg" id="dash-tabs">
+          <button data-tab="overview">Overview</button>
+          <button data-tab="students">Students &amp; Teams</button>
+          <button data-tab="history">History</button>
+        </div>
+        <div id="dash-body"></div>
+      </div>
+    </div>
+
+    <!-- ============ Lesson builder ============ -->
+    <div class="modal" id="builder" hidden>
+      <div class="sheet-card" role="dialog" aria-labelledby="builder-title">
+        <div class="sheet-bar">
+          <button class="text-btn" id="builder-back" hidden>‹ Lessons</button>
+          <h3 id="builder-title">My Lessons</h3>
+          <button class="text-btn bold" id="builder-done" data-i18n="done">Done</button>
+        </div>
+        <div id="builder-body"></div>
+      </div>
+    </div>
+
     <!-- ============ Welcome ============ -->
     <div class="welcome" id="welcome">
       <div class="welcome-card">
@@ -194,6 +316,7 @@
           <li><span class="f-icon" style="--tint:#0a84ff">🔊</span><div><b>Hear every part</b><p>Names, what they do and a fun fact, read aloud.</p></div></li>
           <li><span class="f-icon" style="--tint:#30d158">🎓</span><div><b>Lessons &amp; quizzes</b><p>Guided tours and "find the part" games for the class.</p></div></li>
         </ul>
+        <div class="welcome-lang"><span>Language · भाषा</span><select id="lang-welcome" aria-label="Language"></select></div>
         <button class="btn-filled wide" id="start-camera">✋ Start with Camera</button>
         <button class="btn-plain wide" id="get-started">Continue without camera</button>
         <p class="welcome-note">With the camera on, children can pinch a part to pull it out and hear about it.

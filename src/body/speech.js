@@ -12,6 +12,8 @@ export class Narrator {
     this.rate = 0.95;
     this.voice = null;
     this.voices = [];
+    this.allVoices = [];
+    this.lang = 'en-IN';
     this.log = []; // last utterances, for tests and the transcript
     this.onstart = null;
     this.onend = null;
@@ -27,14 +29,27 @@ export class Narrator {
   }
 
   #loadVoices() {
-    this.voices = this.synth.getVoices().filter((v) => v.lang?.toLowerCase().startsWith('en'));
+    this.allVoices = this.synth.getVoices();
+    const base = this.lang.split('-')[0].toLowerCase();
+    this.voices = this.allVoices.filter((v) => v.lang?.toLowerCase().replace('_', '-').startsWith(base));
     if (!this.voice || !this.voices.includes(this.voice)) {
+      const exact = this.voices.filter((v) => v.lang?.replace('_', '-') === this.lang);
       this.voice =
-        PREFERRED.map((name) => this.voices.find((v) => v.name.includes(name))).find(Boolean) ??
+        (base === 'en' ? PREFERRED.map((name) => this.voices.find((v) => v.name.includes(name))).find(Boolean) : null) ??
+        exact.find((v) => /google|natural|neural/i.test(v.name)) ??
+        exact[0] ??
         this.voices.find((v) => v.default) ??
         this.voices[0] ??
         null;
     }
+  }
+
+  /** Switches narration language (BCP-47, e.g. "hi-IN"). Returns false if no voice is installed for it. */
+  setLang(code) {
+    this.lang = code;
+    this.voice = null;
+    if (this.synth) this.#loadVoices();
+    return this.voices.length > 0 || !this.synth;
   }
 
   setVoice(name) {
@@ -51,6 +66,7 @@ export class Narrator {
     return new Promise((resolve) => {
       const u = new SpeechSynthesisUtterance(text);
       if (this.voice) u.voice = this.voice;
+      u.lang = this.voice?.lang ?? this.lang;
       u.rate = this.rate;
       u.pitch = 1.05;
       let done = false;

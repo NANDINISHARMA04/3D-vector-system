@@ -5,7 +5,7 @@ const state = (page) => page.evaluate(() => window.__body.state);
 const lastSpoken = async (page) => (await state(page)).spoken.at(-1) ?? '';
 
 async function ready(page, query = '') {
-  await page.goto(`${URL}&autostart=1${query}`);
+  await page.goto(`${URL}&autostart=1&lang=en${query}`);
   await page.waitForFunction(() => window.__body?.state.parts.length > 0);
 }
 
@@ -13,7 +13,7 @@ async function ready(page, query = '') {
 async function partPoint(page, i) {
   await page.waitForTimeout(1500);
   const box = await page.locator('#stage').boundingBox();
-  const p = await page.evaluate((i) => window.__body.partScreenPosition(i), i);
+  const p = await page.evaluate((i) => window.__body.partTapPoint(i), i);
   return [box.x + p[0], box.y + p[1]];
 }
 
@@ -92,6 +92,8 @@ test.describe('Body Explorer', () => {
   test('quiz: find the part, wrong answers get a hint', async ({ page }) => {
     await ready(page, '&model=heart');
     await page.locator('#quiz-btn').click();
+    await expect(page.locator('#quiz-setup')).toBeVisible();
+    await page.locator('#qs-start').click();
     await expect(page.locator('#quiz-banner')).toBeVisible();
     await expect(page.locator('#inspector')).toBeHidden();
     await page.waitForFunction(() => window.__body.state.explode > 0.97, null, { timeout: 30_000 });
@@ -108,7 +110,8 @@ test.describe('Body Explorer', () => {
     [x, y] = await partPoint(page, quiz.target);
     await page.mouse.click(x, y);
     await expect(page.locator('#quiz-feedback')).toContainText('Yes!');
-    await expect(page.locator('#quiz-score')).toHaveText('⭐️ 1');
+    // Stars are only for a correct first try.
+    await expect(page.locator('#quiz-score')).toHaveText('⭐️ 0');
     await page.locator('#quiz-stop').click();
     await expect(page.locator('#quiz-banner')).toBeHidden();
   });
@@ -195,5 +198,182 @@ test.describe('Body Explorer', () => {
     await expect(page.locator('#sidebar')).toBeInViewport();
     await page.locator('#systems .row', { hasText: 'Skeletal System' }).click();
     await expect(page.locator('#title')).toHaveText('Skeletal System');
+  });
+
+  // ---------------------------------------------------------------- languages
+  test('Hindi: the whole interface and narration switch to Hindi', async ({ page }) => {
+    await ready(page);
+    await page.locator('#lang').selectOption('hi');
+    await expect(page.locator('#title')).toHaveText('मानव शरीर');
+    await expect(page.locator('#lesson-btn')).toContainText('पाठ शुरू करें');
+    await expect(page.locator('.part-row').first()).toHaveText('मस्तिष्क');
+    expect(await lastSpoken(page)).toContain('मानव शरीर है');
+    await page.locator('.part-row').nth(2).click();
+    await expect(page.locator('#detail-name')).toHaveText('हृदय (दिल)');
+    expect(await lastSpoken(page)).toContain('क्या आप जानते हैं?');
+    // Remembered for next time.
+    await page.goto(`${URL}&autostart=1`);
+    await page.waitForFunction(() => window.__body?.state.parts.length > 0);
+    await expect(page.locator('#title')).toHaveText('मानव शरीर');
+  });
+
+  test('AI languages need the assistant: offline, the language does not change', async ({ page }) => {
+    await page.route('**/api/status', (r) => r.fulfill({ json: { ai: false } }));
+    await ready(page);
+    await page.locator('#lang').selectOption('ta');
+    await expect(page.locator('#toast')).toContainText('needs the AI assistant');
+    expect((await state(page)).lang).toBe('en');
+  });
+
+  test('Tamil: narration is translated by the assistant and cached', async ({ page }) => {
+    let calls = 0;
+    await page.route('**/api/status', (r) => r.fulfill({ json: { ai: true } }));
+    await page.route('**/api/translate', async (r) => {
+      calls++;
+      const { items, language } = r.request().postDataJSON();
+      expect(language).toBe('ta');
+      r.fulfill({ json: { items: Object.fromEntries(items.map((it) => [it.key, `த ${it.text}`])) } });
+    });
+    await ready(page);
+    await page.waitForFunction(() => window.__body.state.ai);
+    await page.locator('#lang').selectOption('ta');
+    await expect(page.locator('#title')).toHaveText('த Human Body');
+    await page.locator('.part-row').first().click();
+    await expect(page.locator('#detail-name')).toHaveText('த Brain');
+    expect(await lastSpoken(page)).toContain('த Did you know?');
+    // Opening another system translates it once; going back uses the cache.
+    await page.locator('#systems .row').nth(1).click();
+    await expect(page.locator('#title')).toHaveText('த Skeletal System');
+    await page.locator('#systems .row').first().click();
+    await expect(page.locator('#title')).toHaveText('த Human Body');
+    expect(calls).toBe(2);
+  });
+
+  // ---------------------------------------------------------------- AI assistant
+  test('Ask: questions go to the AI assistant with the part on screen', async ({ page }) => {
+    let sent;
+    await page.route('**/api/status', (r) => r.fulfill({ json: { ai: true } }));
+    await page.route('**/api/ask', (r) => {
+      sent = r.request().postDataJSON();
+      r.fulfill({ json: { answer: 'When you run, your muscles need more oxygen, so your heart pumps faster to deliver it.' } });
+    });
+    await ready(page);
+    await page.locator('.part-row', { hasText: 'Heart' }).click();
+    await page.locator('#ask-btn').click();
+    await expect(page.locator('#ask')).toBeVisible();
+    await expect(page.locator('#ask-status')).toHaveText('AI ready');
+    await page.locator('#ask-input').fill('Why does my heart beat faster when I run?');
+    await page.locator('#ask-form button[type=submit]').click();
+    await expect(page.locator('.bubble.bot').last()).toContainText('muscles need more oxygen');
+    expect(sent).toMatchObject({ question: 'Why does my heart beat faster when I run?', part: 'Heart', language: 'en', model: 'Human Body' });
+    expect(await lastSpoken(page)).toContain('muscles need more oxygen');
+  });
+
+  test('Ask: without the AI, answers come from the built-in lessons', async ({ page }) => {
+    await page.route('**/api/status', (r) => r.fulfill({ json: { ai: false } }));
+    await ready(page);
+    await page.locator('#ask-btn').click();
+    await expect(page.locator('#ask-status')).toHaveText('Offline answers');
+    await page.locator('#ask-input').fill('What does the liver do?');
+    await page.locator('#ask-input').press('Enter');
+    await expect(page.locator('.bubble.bot').last()).toContainText('cleans your blood');
+    await expect(page.locator('.bubble.bot').last()).toContainText('Offline answer');
+  });
+
+  // ---------------------------------------------------------------- classroom
+  test('Team quiz: two teams take turns with a live scoreboard', async ({ page }) => {
+    await ready(page, '&model=heart');
+    await page.locator('#quiz-btn').click();
+    await page.locator('#qs-mode button', { hasText: 'Two teams' }).click();
+    await expect(page.locator('#qs-teams')).toBeVisible();
+    await page.locator('#qs-count button', { hasText: '5' }).click();
+    await page.locator('#qs-start').click();
+    await expect(page.locator('#team-board .team')).toHaveCount(2);
+    await expect(page.locator('#team-board .team.active')).toContainText('Red Team');
+    expect(await lastSpoken(page)).toContain('Red Team, it’s your turn.');
+    const s0 = await state(page);
+    expect(s0.quiz.total % 2).toBe(0); // fair: both teams get the same number
+    // Red answers correctly on the first try (canvas tapping is covered by the solo quiz test).
+    await page.evaluate((i) => window.__body.choosePart(i), s0.quiz.target);
+    await expect(page.locator('#team-board .team').first()).toContainText('1');
+    await expect(page.locator('#team-board .team.active')).toContainText('Blue Team', { timeout: 20_000 });
+  });
+
+  test('Solo quiz results are saved to the class dashboard', async ({ page }) => {
+    await ready(page, '&model=tooth');
+    await page.locator('#quiz-btn').click();
+    await page.locator('#qs-new').fill('Meera');
+    await page.locator('#qs-add button').click();
+    await expect(page.locator('#qs-players li.on')).toHaveText('Meera');
+    await page.locator('#qs-count button', { hasText: '5' }).click();
+    await page.locator('#qs-start').click();
+    for (let i = 0; i < 5; i++) {
+      await page.waitForFunction((i) => window.__body.state.quiz.index === i, i, { timeout: 20_000 });
+      await page.locator('#quiz-skip').click();
+    }
+    await expect(page.locator('#quiz-question')).toContainText('You found 0 out of 5', { timeout: 20_000 });
+    await page.locator('#quiz-stop').click();
+    await page.locator('#open-dashboard').click();
+    await expect(page.locator('.tile').first()).toContainText('1');
+    await page.locator('#dash-tabs button', { hasText: 'Students' }).click();
+    await expect(page.locator('#dash-body')).toContainText('Meera');
+    await expect(page.locator('#dash-body')).toContainText('1 quiz');
+    await page.locator('#dash-tabs button', { hasText: 'History' }).click();
+    await expect(page.locator('#dash-body table')).toContainText('Tooth (Molar)');
+    const download = page.waitForEvent('download');
+    await page.locator('#dash-csv').click();
+    expect((await download).suggestedFilename()).toMatch(/body-explorer-results-.*\.csv/);
+  });
+
+  test('Lesson builder: a teacher-made lesson appears in the sidebar and plays', async ({ page }) => {
+    await ready(page);
+    await page.locator('#open-builder').click();
+    await page.locator('#new-lesson').click();
+    await page.locator('#lesson-title').fill('Breathing basics');
+    await page.locator('#lesson-model').selectOption('lungs');
+    // Keep only the trachea and the diaphragm.
+    const boxes = page.locator('#builder-body [data-on]');
+    const n = await boxes.count();
+    for (let i = 0; i < n; i++) {
+      const name = await page.locator('#builder-body .step-head b').nth(i).textContent();
+      if (!['Trachea', 'Diaphragm'].includes(name)) await boxes.nth(i).uncheck();
+    }
+    await page.locator('[data-note]').first().fill('Put your hand on your throat and breathe in!');
+    await page.locator('#save-lesson').click();
+    await expect(page.locator('#builder-body')).toContainText('Breathing basics');
+    await page.locator('#builder-done').click();
+    const row = page.locator('#systems .row', { hasText: 'Breathing basics' });
+    await expect(row).toBeVisible();
+    await row.click();
+    await expect(page.locator('#toolbar-lesson')).toBeVisible();
+    await expect(page.locator('#title')).toHaveText('Respiratory System');
+    await expect(page.locator('#lesson-total')).toHaveText('2');
+    await expect(page.locator('#detail-name')).toHaveText('Trachea', { timeout: 20_000 });
+    await expect(page.locator('#detail-note')).toBeVisible();
+    await expect(page.locator('#detail-note-text')).toHaveText('Put your hand on your throat and breathe in!');
+  });
+
+  // ---------------------------------------------------------------- accessibility
+  test('Accessibility: large text, colour-blind colours and switch scanning', async ({ page }) => {
+    await ready(page, '&model=heart');
+    await page.locator('#settings-btn').click();
+    await page.locator('#a11y-large').check();
+    await page.locator('#a11y-cb').check();
+    await page.locator('#a11y-scan').check();
+    await page.locator('#settings-done').click();
+    await expect(page.locator('body')).toHaveClass(/large-text/);
+    await expect(page.locator('.part-row .pdot').first()).toHaveCSS('color', 'rgb(57, 135, 229)');
+    await expect(page.locator('#scan-hint')).toBeVisible();
+    await page.waitForFunction(() => window.__body.state.scanIndex >= 0);
+    const idx = (await state(page)).scanIndex;
+    await page.locator('#stage').press('Space');
+    const s = await state(page);
+    expect([idx, (idx + 1) % s.parts.length]).toContain(s.selected);
+    expect(await lastSpoken(page)).toMatch(/Did you know\?/);
+    // Settings persist across reloads.
+    await page.reload();
+    await page.waitForFunction(() => window.__body?.state.parts.length > 0);
+    await expect(page.locator('body')).toHaveClass(/large-text/);
+    await expect(page.locator('body')).toHaveClass(/scanning/);
   });
 });
