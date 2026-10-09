@@ -1,0 +1,22 @@
+{
+  "name": "vector",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Vector - gesture-controlled 3D particle models with MediaPipe hand tracking and WebGL2 transform feedback",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "npm run test:unit && npm run test:e2e",
+    "test:unit": "node --test tests/unit/*.test.js",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "@mediapipe/tasks-vision": "0.10.14"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1",
+    "vite": "6.4.4"
+  }
+}

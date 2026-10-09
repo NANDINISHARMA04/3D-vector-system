@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Vector: snap, form and explode 3D particle models with your hand." />
+    <title>Vector</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='13' fill='none' stroke='%237fd1ff' stroke-width='3'/%3E%3Ccircle cx='16' cy='16' r='5' fill='%237fd1ff'/%3E%3C/svg%3E" />
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <video id="video" playsinline muted></video>
+    <canvas id="gl"></canvas>
+    <svg id="leaders" aria-hidden="true"></svg>
+    <div id="labels" aria-hidden="true"></div>
+    <canvas id="overlay" aria-hidden="true"></canvas>
+
+    <header class="brand">
+      <svg viewBox="0 0 32 32" class="logo" aria-hidden="true"><circle cx="16" cy="16" r="12" /><circle cx="16" cy="16" r="4.5" class="dot" /></svg>
+      <div>
+        <h1>Vector</h1>
+        <p>snap · form · explode — with your hand</p>
+      </div>
+    </header>
+
+    <aside id="panel" class="glass">
+      <span id="category" class="badge">—</span>
+      <h2 id="model-name">Loading…</h2>
+      <p id="model-sub" class="muted"></p>
+
+      <div class="row"><span class="key">Scene</span><span id="scene-state" class="pill">Dissolved</span></div>
+      <div class="row"><span class="key">Hand</span><span id="hand-state" class="pill dim">No hand</span></div>
+      <div class="row">
+        <label class="key" for="sensitivity">Gesture sensitivity</label>
+        <select id="sensitivity">
+          <option value="strict">Strict</option>
+          <option value="standard" selected>Standard</option>
+          <option value="forgiving">Forgiving</option>
+        </select>
+      </div>
+      <p class="hint muted">More forgiving helps recognise less distinct hand poses.</p>
+
+      <div class="meter">
+        <div class="row"><span class="key">Hand openness</span><span id="openness-val">0%</span></div>
+        <div class="bar"><i id="openness-bar"></i></div>
+      </div>
+      <div class="meter">
+        <div class="row"><label class="key" for="explode">Exploded view</label><span id="explode-val">0%</span></div>
+        <input id="explode" type="range" min="0" max="100" value="0" />
+        <p class="hint muted">Open your hand to pull it apart — close it to assemble.</p>
+      </div>
+
+      <span class="key section">Gestures</span>
+      <ul id="gestures">
+        <li data-g="snap"><i>🫰</i><span><b>Snap</b> — summon particles / dissolve</span></li>
+        <li data-g="fist"><i>✊</i><span><b>Fist</b> — put it together</span></li>
+        <li data-g="open"><i>🖐️</i><span><b>Open slowly</b> — explode it, see inside</span></li>
+        <li data-g="twist"><i>🔄</i><span><b>Twist / raise hand</b> — rotate &amp; tilt it</span></li>
+        <li data-g="point"><i>☝️</i><span><b>Point</b> at a part to learn it · <b>pinch</b> 🤏 pulls it out</span></li>
+        <li data-g="two"><i>🙌</i><span><b>Two hands</b> apart / together — zoom</span></li>
+        <li data-g="peace"><i>✌️</i><span><b>Peace</b> — jump to the next model</span></li>
+      </ul>
+    </aside>
+
+    <div id="hud" class="glass">
+      <div><b id="fps">0</b> fps · <b id="pcount">0</b> particles</div>
+      <div class="muted" id="camstat">camera off</div>
+    </div>
+
+    <div id="toolbar">
+      <button data-action="camera" title="Camera on/off (V)"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="13" height="12" rx="2" /><path d="M16 10l5-3v10l-5-3z" /></svg></button>
+      <button data-action="video" title="Show / hide camera background (B)"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 15l5-5 4 4 3-3 6 6" /></svg></button>
+      <button data-action="reset" title="Reset view (R)"><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.4-5.7" /><path d="M4 4v4h4" /></svg></button>
+      <button data-action="rotate" title="Auto-rotate (A)" class="on"><svg viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="9" ry="4" /><path d="M12 3v18" /><path d="M18 9l2 3-3 1" /></svg></button>
+      <button data-action="section" title="Section cut — see inside (C)"><svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="3" /><circle cx="6" cy="18" r="3" /><path d="M8.5 7.5L20 18M8.5 16.5L20 6" /></svg></button>
+      <button data-action="tour" title="Guided tour of parts (T)"><svg viewBox="0 0 24 24"><path d="M2 9l10-5 10 5-10 5z" /><path d="M6 11v5c3 2 9 2 12 0v-5" /></svg></button>
+      <button data-action="shot" title="Save screenshot (S)"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7" /><circle cx="12" cy="12" r="3" /></svg></button>
+      <button data-action="help" title="Help (H)"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .9-1 1.7M12 17h.01" /></svg></button>
+    </div>
+
+    <div id="partcard" class="glass" hidden>
+      <i id="partcard-dot"></i>
+      <div><b id="partcard-name"></b><span id="partcard-desc"></span></div>
+      <small id="partcard-hint">pinch to pull it out</small>
+    </div>
+
+    <nav id="dock" class="glass">
+      <div id="tabs" role="tablist"></div>
+      <div id="chips"></div>
+    </nav>
+
+    <div id="toast" role="status" aria-live="polite"></div>
+
+    <section id="start" class="overlay">
+      <div class="card glass">
+        <svg viewBox="0 0 32 32" class="logo big" aria-hidden="true"><circle cx="16" cy="16" r="12" /><circle cx="16" cy="16" r="4.5" class="dot" /></svg>
+        <h2>Vector</h2>
+        <p>Hold up your hand in front of the webcam. Snap to summon a model made of
+          particles, open your hand to explode it, point at parts to learn what they do.</p>
+        <div class="actions">
+          <button id="start-camera" class="primary">Start with camera</button>
+          <button id="start-nocam">Continue without camera</button>
+        </div>
+        <p class="muted small">Video is processed on your device with MediaPipe and never leaves your browser.
+          Without a camera: drag to rotate, scroll to zoom, click parts, <kbd>Space</kbd> to snap.</p>
+      </div>
+    </section>
+
+    <section id="help" class="overlay" hidden>
+      <div class="card glass">
+        <h2>Controls</h2>
+        <div class="cols">
+          <div>
+            <h3>Hand</h3>
+            <ul>
+              <li>🫰 Snap — summon / dissolve</li>
+              <li>✊ Fist — assemble</li>
+              <li>🖐️ Open hand — exploded view</li>
+              <li>🔄 Twist wrist — spin · raise/lower — tilt</li>
+              <li>☝️ Point — identify a part</li>
+              <li>🤏 Pinch on a part — drag it out</li>
+              <li>🙌 Two hands — zoom</li>
+              <li>✌️ Peace — next model</li>
+            </ul>
+          </div>
+          <div>
+            <h3>Mouse &amp; keys</h3>
+            <ul>
+              <li>Drag — rotate · Scroll — zoom</li>
+              <li>Hover — identify · Drag a part — pull out</li>
+              <li><kbd>Space</kbd> snap · <kbd>F</kbd> assemble · <kbd>E</kbd> explode</li>
+              <li><kbd>N</kbd>/<kbd>→</kbd> next · <kbd>←</kbd> previous</li>
+              <li><kbd>R</kbd> reset · <kbd>A</kbd> auto-rotate · <kbd>C</kbd> section</li>
+              <li><kbd>T</kbd> tour · <kbd>S</kbd> screenshot · <kbd>V</kbd> camera</li>
+            </ul>
+          </div>
+        </div>
+        <div class="actions"><button id="help-close" class="primary">Got it</button></div>
+      </div>
+    </section>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
