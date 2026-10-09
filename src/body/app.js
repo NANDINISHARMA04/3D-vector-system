@@ -8,8 +8,8 @@ import { GestureTracker } from '../gestures.js';
 import { Labels } from '../labels.js';
 import { Overlay } from '../overlay.js';
 import { findModel } from '../models/index.js';
-import { orbitCamera, project, pickPart, explodeFit, partAnchor } from '../viewer.js';
-import { clamp, smooth, remap } from '../math.js';
+import { orbitCamera, project, unproject, pickPart, explodeFit, partAnchor } from '../viewer.js';
+import { clamp, smooth, remap, v3 } from '../math.js';
 import { LESSONS, SECTIONS, narration } from './content.js';
 import { Narrator } from './speech.js';
 
@@ -89,7 +89,24 @@ const S = {
   mouse: null,
   injected: null,
   pointHold: { part: -1, since: 0, fired: false },
+  grab: { part: -1, active: false, byHand: false, offset: [0, 0, 0], base: [0, 0, 0], start: null },
+  cameraBg: true,
 };
+
+// ------------------------------------------------------------------ pulling parts out
+// A pinch (or a mouse drag on a part) grabs it; it follows the hand and springs back on release.
+function startGrab(part, x, y, byHand) {
+  const same = S.grab.part === part;
+  const base = same ? [...S.grab.offset] : [0, 0, 0];
+  S.grab = { part, active: true, byHand, base, offset: [...base], start: unproject(cam, x, y) };
+}
+function moveGrab(x, y) {
+  S.grab.offset = v3.add(S.grab.base, v3.sub(unproject(cam, x, y), S.grab.start));
+}
+function endGrab() {
+  S.grab.active = false;
+}
+const pick = (x, y) => pickPart(S.sample, cam, x, y, { explode: S.explode, grab: S.grab });
 
 // ------------------------------------------------------------------ systems
 let particles;
@@ -205,6 +222,7 @@ function applyModel(sample) {
   S.selected = -1;
   S.hover = -1;
   S.focusPart = -1;
+  S.grab = { part: -1, active: false, byHand: false, offset: [0, 0, 0], base: [0, 0, 0], start: null };
   labels.setParts(sample.parts);
   ui.eyebrow.textContent = item?.section ?? 'Anatomy';
   ui.title.textContent = item ? itemLabel(item) : model.name;
@@ -567,7 +585,7 @@ ui.gl.addEventListener('pointerdown', (e) => {
   ui.gl.setPointerCapture(e.pointerId);
   const p = local(e);
   S.pointers.set(e.pointerId, p);
-  if (S.pointers.size === 1) S.dragging = { start: p, last: p, moved: 0 };
+  if (S.pointers.size === 1) S.dragging = { start: p, last: p, moved: 0, part: pick(p[0], p[1]) };
   else {
     S.dragging = null;
     const [a, b] = [...S.pointers.values()];
@@ -588,6 +606,16 @@ ui.gl.addEventListener('pointermove', (e) => {
     const dx = p[0] - S.dragging.last[0];
     const dy = p[1] - S.dragging.last[1];
     S.dragging.moved += Math.abs(dx) + Math.abs(dy);
+    if (S.dragging.part >= 0 && S.mode !== 'quiz') {
+      // Dragging a part pulls it out of the body (and tells you about it).
+      if (!S.grab.active && S.dragging.moved > 6) {
+        startGrab(S.dragging.part, S.dragging.start[0], S.dragging.start[1], false);
+        if (S.dragging.part !== S.selected) onPartChosen(S.dragging.part);
+      }
+      if (S.grab.active) moveGrab(p[0], p[1]);
+      S.dragging.last = p;
+      return;
+    }
     S.yaw -= dx * 0.008;
     S.pitch = clamp(S.pitch + dy * 0.006, -1.2, 1.2);
     S.pitchTarget = S.pitch;
@@ -597,8 +625,9 @@ ui.gl.addEventListener('pointermove', (e) => {
 });
 const endPointer = (e) => {
   const p = local(e);
+  if (S.grab.active && !S.grab.byHand) endGrab();
   if (S.dragging && S.dragging.moved < 6 && S.pointers.size === 1) {
-    const part = pickPart(S.sample, cam, p[0], p[1], { explode: S.explode });
+    const part = pick(p[0], p[1]);
     if (part >= 0) onPartChosen(part);
     else if (S.mode === 'explore') clearSelection();
   }
@@ -637,6 +666,15 @@ window.addEventListener('keydown', (e) => {
 });
 
 // ------------------------------------------------------------------ hand control
+const GESTURE_OF = { point: 'point', pinch: 'pinch', open: 'open', moving: 'open', fist: 'fist', peace: 'peace', two: 'two' };
+let shownGesture;
+function showGesture(pose) {
+  const g = pose ? GESTURE_OF[pose] ?? null : null;
+  if (g === shownGesture) return;
+  shownGesture = g;
+  document.querySelectorAll('#gesture-guide [data-g]').forEach((el) => el.classList.toggle('on', el.dataset.g === g));
+}
+$('#camera-bg').onchange = (e) => ui.body.classList.toggle('pip-camera', !e.target.checked);
 async function toggleHands() {
   if (tracker.running) {
     tracker.stop();
@@ -652,11 +690,16 @@ async function toggleHands() {
     await tracker.start();
     ui.body.classList.add('camera-on');
     ui.handsBtn.classList.add('active');
-    toast('Point at a part and hold ☝️');
+    toast('Show your hand ✋ then pinch a part 🤏');
   } catch (err) {
     console.warn(err);
+    const cameraWorked = tracker.running;
+    tracker.stop();
     ui.video.hidden = true;
-    toast(err?.name === 'NotAllowedError' ? 'Camera permission was denied' : 'No camera found');
+    ui.body.classList.remove('camera-on');
+    if (err?.name === 'NotAllowedError') toast('Camera permission was denied');
+    else if (cameraWorked) toast('Hand tracking could not load: check the internet connection');
+    else toast('No camera found');
   }
 }
 ui.handsBtn.onclick = toggleHands;
@@ -666,8 +709,11 @@ function handleHands(now, dt) {
   const g = gestures.update(hands, now, 'forgiving');
   const P = g.primary;
   let targetYawVel = null;
+  showGesture(P ? (g.analyses.length > 1 ? 'two' : g.pose) : null);
   if (!P) {
     S.pointHold.part = -1;
+    S.prevPose = 'none';
+    if (S.grab.active && S.grab.byHand) endGrab();
     return { g, targetYawVel };
   }
   for (const ev of g.events) if (ev === 'next' && S.sample) onPartChosen((S.selected + 1) % S.sample.parts.length);
@@ -683,8 +729,27 @@ function handleHands(now, dt) {
       if (Math.abs(P.roll) > dead) targetYawVel = -(P.roll - Math.sign(P.roll) * dead) * 2.4;
       break;
     }
+    case 'pinch': {
+      const x = (P.indexTip[0] + P.thumbTip[0]) / 2;
+      const y = (P.indexTip[1] + P.thumbTip[1]) / 2;
+      if (!S.grab.active) {
+        // Grab what you were pointing at, or whatever is under the pinch.
+        const part = S.hover >= 0 && (S.prevPose === 'point' || S.prevPose === 'pinch') ? S.hover : pick(x, y);
+        if (part >= 0) {
+          S.hover = part;
+          if (S.mode === 'quiz') onPartChosen(part);
+          else {
+            startGrab(part, x, y, true);
+            if (part !== S.selected) onPartChosen(part); // name + fun fact, right away
+          }
+        }
+      } else if (S.grab.byHand) {
+        moveGrab(x, y);
+      }
+      break;
+    }
     case 'point': {
-      const part = pickPart(S.sample, cam, P.indexTip[0], P.indexTip[1], { explode: S.explode });
+      const part = pick(P.indexTip[0], P.indexTip[1]);
       S.hover = part;
       const hold = S.pointHold;
       if (part !== hold.part) Object.assign(hold, { part, since: now, fired: false });
@@ -698,6 +763,8 @@ function handleHands(now, dt) {
       break;
   }
   if (g.pose !== 'point') S.pointHold.part = -1;
+  if (g.pose !== 'pinch' && S.grab.active && S.grab.byHand) endGrab();
+  S.prevPose = g.pose;
   if (g.zoom) {
     if (S.zoomBase == null) S.zoomBase = S.distTarget;
     S.distTarget = clamp(S.zoomBase / g.zoom, 1.6, 10);
@@ -726,7 +793,8 @@ function frame(now) {
 
   if (!handPresent) {
     S.hover = -1;
-    if (S.mouse && !S.dragging) S.hover = pickPart(S.sample, cam, S.mouse[0], S.mouse[1], { explode: S.explode });
+    if (S.mouse && !S.dragging) S.hover = pick(S.mouse[0], S.mouse[1]);
+    if (S.grab.active) S.hover = S.grab.part;
     if (S.listHover >= 0) S.hover = S.listHover;
   }
   ui.gl.classList.toggle('over-part', S.hover >= 0 && !S.dragging);
@@ -741,6 +809,10 @@ function frame(now) {
   S.dist = smooth(S.dist, S.distTarget, 7, dt);
 
   S.form = smooth(S.form, S.formTarget, 2.2, dt);
+  if (!S.grab.active && S.grab.part >= 0) {
+    S.grab.offset = S.grab.offset.map((v) => v * Math.exp(-2.5 * dt));
+    if (v3.len(S.grab.offset) < 0.003) S.grab.part = -1;
+  }
   S.explode = smooth(S.explode, S.explodeTarget, 4, dt);
 
   // Which part to spotlight: a wrong quiz answer flashes, else hover, else selection.
@@ -750,11 +822,11 @@ function frame(now) {
   S.focus = smooth(S.focus, spot >= 0 ? (S.selected >= 0 || S.flash ? 1 : 0.7) : 0, 8, dt);
 
   cam = camera();
-  particles.step(dt, now / 1000, { form: S.form, explode: S.explode, grabPart: -1, grabOffset: [0, 0, 0], hand: [99, 99, 99], handForce: 0 });
+  particles.step(dt, now / 1000, { form: S.form, explode: S.explode, grabPart: S.grab.part, grabOffset: S.grab.offset, hand: [99, 99, 99], handForce: 0 });
   particles.draw(cam.view, cam.proj, { hover: S.focus > 0.01 ? S.focusPart : -1, focus: S.focus, clip: false, form: S.form });
 
   if (S.sample) {
-    const anchors = S.sample.parts.map((p) => project(cam, partAnchor(p, S.explode)));
+    const anchors = S.sample.parts.map((p) => project(cam, partAnchor(p, S.explode, S.grab)));
     const [b0, b1] = S.sample.bounds;
     const lo = b0[0].map((v, k) => v + (b1[0][k] - v) * S.explode);
     const hi = b0[1].map((v, k) => v + (b1[1][k] - v) * S.explode);
@@ -795,9 +867,14 @@ function start() {
   if (S.model) say(LESSONS[S.model.id]?.intro ?? S.model.name);
 }
 $('#get-started').onclick = start;
+$('#start-camera').onclick = () => {
+  start();
+  toggleHands();
+};
 if (params.get('autostart')) {
   S.started = true;
   ui.welcome.hidden = true;
+  if (params.get('autostart') === 'camera') toggleHands();
 }
 
 requestAnimationFrame(frame);
@@ -814,6 +891,8 @@ window.__body = {
       explode: S.explode,
       explodeTarget: S.explodeTarget,
       mode: S.mode,
+      grabPart: S.grab.part,
+      grabActive: S.grab.active,
       quiz: { index: Q.i, score: Q.score, target: S.mode === 'quiz' ? Q.list[Q.i] : -1 },
       spoken: narrator.log.slice(),
       fps,
@@ -821,5 +900,5 @@ window.__body = {
   },
   openModel,
   injectHands: (h) => (S.injected = h),
-  partScreenPosition: (i) => (S.sample ? project(cam, partAnchor(S.sample.parts[i], S.explode)) : null),
+  partScreenPosition: (i) => (S.sample ? project(cam, partAnchor(S.sample.parts[i], S.explode, S.grab)) : null),
 };

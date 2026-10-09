@@ -68,7 +68,16 @@
           </div>
         </header>
 
-        <video id="video" class="pip" playsinline muted hidden></video>
+        <video id="video" class="camera" playsinline muted hidden></video>
+
+        <div class="gesture-guide" id="gesture-guide" aria-hidden="true">
+          <span data-g="point">☝️ Point &amp; hold</span>
+          <span data-g="pinch">🤏 Pinch to pull out</span>
+          <span data-g="open">🖐️ Open = apart</span>
+          <span data-g="fist">✊ Fist = together</span>
+          <span data-g="two">🙌 Two hands = zoom</span>
+          <span data-g="peace">✌️ Next part</span>
+        </div>
 
         <aside class="inspector" id="inspector" aria-label="Parts">
           <h3 class="section-header">Parts <span id="part-count"></span></h3>
@@ -158,8 +167,13 @@
           </li>
         </ul>
         <h4 class="section-header">Hand control</h4>
-        <ul class="inset-group form info">
+        <ul class="inset-group form">
+          <li><label for="camera-bg">Show camera behind the model</label><input type="checkbox" class="switch" id="camera-bg" checked /></li>
+        </ul>
+        <ul class="inset-group form info" style="margin-top:10px">
           <li>☝️ <span><b>Point</b> at a part and hold to hear about it</span></li>
+          <li>🤏 <span><b>Pinch</b> a part to pull it out and hear its fun fact</span></li>
+          <li>🙌 <span><b>Two hands</b> apart or together to zoom</span></li>
           <li>🖐️ <span><b>Open your hand</b> to take the body apart</span></li>
           <li>✊ <span><b>Make a fist</b> to put it back together</span></li>
           <li>✌️ <span><b>Peace sign</b> for the next part</span></li>
@@ -180,7 +194,10 @@
           <li><span class="f-icon" style="--tint:#0a84ff">🔊</span><div><b>Hear every part</b><p>Names, what they do and a fun fact, read aloud.</p></div></li>
           <li><span class="f-icon" style="--tint:#30d158">🎓</span><div><b>Lessons &amp; quizzes</b><p>Guided tours and "find the part" games for the class.</p></div></li>
         </ul>
-        <button class="btn-filled wide" id="get-started">Get Started</button>
+        <button class="btn-filled wide" id="start-camera">✋ Start with Camera</button>
+        <button class="btn-plain wide" id="get-started">Continue without camera</button>
+        <p class="welcome-note">With the camera on, children can pinch a part to pull it out and hear about it.
+          The picture stays on this device.</p>
       </div>
     </div>
 

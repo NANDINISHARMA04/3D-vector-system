@@ -142,12 +142,36 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round
 }
 .segmented.small { min-width: 230px; }
 
-/* Camera picture-in-picture */
-.pip {
-  position: absolute; top: 108px; right: 24px; width: 200px; aspect-ratio: 16 / 10; object-fit: cover;
-  transform: scaleX(-1); border-radius: 16px; z-index: 9; background: #111;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5); border: 0.5px solid var(--sep);
+/* Camera: fills the stage behind the model (or a small preview, from Settings) */
+#gl { z-index: 1; }
+#leaders, #labels, #overlay { z-index: 2; }
+.camera {
+  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0;
+  transform: scaleX(-1); filter: brightness(0.55) saturate(0.9); background: #000;
 }
+body.camera-on .stage::after {
+  content: ''; position: absolute; inset: 0; z-index: 0; pointer-events: none;
+  background: radial-gradient(ellipse 60% 70% at 50% 50%, transparent 40%, rgba(0, 0, 0, 0.55));
+}
+body.pip-camera .camera {
+  inset: auto 24px auto auto; top: 108px; width: 200px; height: auto; aspect-ratio: 16 / 10; z-index: 9;
+  filter: none; border-radius: 16px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5); border: 0.5px solid var(--sep);
+}
+body.camera-on .inspector { top: 164px; }
+body.pip-camera.camera-on .inspector { top: 248px; }
+body.pip-camera.camera-on .stage::after { display: none; }
+
+/* Gesture guide (visible while the camera is on) */
+.gesture-guide {
+  position: absolute; top: 112px; left: 50%; transform: translateX(-50%); z-index: 10;
+  display: none; gap: 6px; padding: 6px; border-radius: 999px; max-width: calc(100% - 48px); overflow-x: auto; scrollbar-width: none;
+  background: var(--material); backdrop-filter: blur(30px) saturate(1.6); -webkit-backdrop-filter: blur(30px) saturate(1.6);
+  border: 0.5px solid rgba(255, 255, 255, 0.08); pointer-events: none;
+}
+body.camera-on .gesture-guide { display: flex; }
+body.camera-on .quiz-banner { top: 168px; }
+.gesture-guide span { flex: none; padding: 5px 11px; border-radius: 999px; font-size: 13px; font-weight: 600; color: var(--label-2); transition: all 0.25s var(--ease); white-space: nowrap; }
+.gesture-guide span.on { background: var(--blue); color: #fff; transform: scale(1.06); box-shadow: 0 4px 14px rgba(10, 132, 255, 0.5); }
 
 /* Parts inspector */
 .inspector {
@@ -157,7 +181,6 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round
   -webkit-mask-image: linear-gradient(180deg, #000 85%, transparent);
 }
 .inspector::-webkit-scrollbar { display: none; }
-body.camera-on .inspector { top: 248px; }
 body.quiz .inspector { display: none; }
 .inspector .section-header { margin: 0 12px 7px; display: flex; justify-content: space-between; }
 .inspector .section-header span { color: var(--label-3); }
@@ -238,7 +261,9 @@ li:last-child .part-row::after { display: none; }
 .btn-tinted { background: rgba(10, 132, 255, 0.18); color: var(--blue); }
 .btn-plain { background: transparent; color: var(--label-2); }
 .btn-filled:active, .btn-tinted:active, .btn-plain:active { transform: scale(0.96); }
-.btn-filled.wide { width: 100%; height: 52px; font-size: 17px; border-radius: 14px; }
+.btn-filled.wide, .btn-plain.wide { width: 100%; height: 52px; font-size: 17px; border-radius: 14px; }
+.btn-plain.wide { margin-top: 8px; color: var(--blue); }
+.welcome-note { margin: 14px 8px 0; font-size: 13px; color: var(--label-3); }
 .lesson-progress { padding-left: 14px; font-size: 14px; color: var(--label-2); white-space: nowrap; }
 .lesson-progress b { color: var(--label); }
 .progress { width: 120px; height: 4px; border-radius: 2px; background: var(--fill); overflow: hidden; }
@@ -320,7 +345,8 @@ body.no-labels #labels, body.no-labels #leaders { visibility: hidden; }
   .detail { left: 16px; bottom: 92px; width: calc(100% - 32px); }
   .detail-summary { font-size: 16px; }
   .quiz-banner { top: 150px; min-width: 0; width: calc(100% - 32px); }
-  .pip { top: auto; bottom: 92px; right: 16px; width: 130px; }
+  body.pip-camera .camera { top: auto; bottom: 92px; right: 16px; width: 130px; }
+  .gesture-guide { top: 168px; justify-content: flex-start; }
   .btn-filled, .btn-tinted { padding: 0 16px; }
   .progress { width: 60px; }
 }

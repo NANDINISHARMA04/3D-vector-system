@@ -26,8 +26,13 @@ explorer for teachers to show children how the body works.
 - **Quiz**: "Can you find the heart?" Five questions per round, with gentle hints for
   wrong answers, a star score and confetti.
 - **Together / Peek / Apart** segmented control to take the model apart.
-- **Optional hand control**: point and hold at a part, open hand to take it apart,
-  fist to put it back, peace sign for the next part, twist to rotate.
+- **Camera mode** ("Start with Camera"): the class sees themselves behind the 3D body
+  with their hand skeleton drawn on top. **Pinch a part to pull it out** and it is
+  named and explained aloud; point and hold also works. Open hand = apart, fist =
+  together, two hands = zoom, peace sign = next part, twist = rotate. A gesture guide
+  lights up as each gesture is recognised. (Needs internet the first time to load
+  the hand-tracking model; the video never leaves the device.)
+- With a mouse or touchscreen you can also drag a part out of the body.
 - Works on laptops, interactive whiteboards, iPads and phones (the sidebar collapses).
 
 Open http://localhost:5173/body.html after `npm run dev`. Narration text lives in

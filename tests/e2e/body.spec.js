@@ -139,6 +139,54 @@ test.describe('Body Explorer', () => {
     await page.evaluate(() => window.__body.injectHands(null));
   });
 
+  test('hand control: pinching a part pulls it out and narrates it', async ({ page }) => {
+    await ready(page);
+    await page.locator('#view-seg button', { hasText: 'Apart' }).click();
+    await page.waitForFunction(() => window.__body.state.explode > 0.97, null, { timeout: 30_000 });
+    const brain = (await state(page)).parts.indexOf('Brain');
+    const tip = await page.evaluate((i) => window.__body.partScreenPosition(i), brain);
+    const pinchAt = (pose, x, y) =>
+      page.evaluate(
+        async ({ pose, x, y }) => {
+          const { poseHand } = await import('/src/synthHand.js');
+          const lm = poseHand(pose, { x: 600, y: 600, size: 110 });
+          const dx = x - lm[8][0];
+          const dy = y - lm[8][1];
+          window.__body.injectHands([lm.map(([a, b, c]) => [a + dx, b + dy, c])]);
+        },
+        { pose, x, y },
+      );
+    await pinchAt('pinch', tip[0], tip[1]);
+    await page.waitForFunction((i) => window.__body.state.grabActive && window.__body.state.grabPart === i, brain);
+    await expect(page.locator('#detail-name')).toHaveText('Brain');
+    expect(await lastSpoken(page)).toMatch(/^Brain\. .*Did you know\?/);
+    await expect(page.locator('#gesture-guide [data-g="pinch"]')).toHaveClass(/on/);
+
+    // The part follows the pinching hand.
+    await pinchAt('pinch', tip[0] - 150, tip[1] + 120);
+    await page.waitForFunction(([i, x0]) => x0 - window.__body.partScreenPosition(i)[0] > 100, [brain, tip[0]]);
+
+    // Letting go springs it back.
+    await page.evaluate(() => window.__body.injectHands(null));
+    await page.waitForFunction(() => !window.__body.state.grabActive);
+    await page.waitForFunction(() => window.__body.state.grabPart === -1, null, { timeout: 15_000 });
+  });
+
+  test('mouse: dragging a part pulls it out', async ({ page }) => {
+    await ready(page);
+    await page.locator('#view-seg button', { hasText: 'Apart' }).click();
+    await page.waitForFunction(() => window.__body.state.explode > 0.97, null, { timeout: 30_000 });
+    const heart = (await state(page)).parts.indexOf('Heart');
+    const [x, y] = await partPoint(page, heart);
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x + 60, y + 80, { steps: 6 });
+    await page.waitForFunction((i) => window.__body.state.grabActive && window.__body.state.grabPart === i, heart);
+    await expect(page.locator('#detail-name')).toHaveText('Heart');
+    await page.mouse.up();
+    await page.waitForFunction(() => !window.__body.state.grabActive);
+  });
+
   test('phone layout hides the sidebar behind a button', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await ready(page);
